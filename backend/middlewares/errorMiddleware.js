@@ -10,10 +10,10 @@ class CustomError extends Error {
 const errorHandler = (err, req, res, next) => {
   // Check if a status code is defined, otherwise default to 500
   const statusCode = err.statusCode || 500;
-  // Use the custom message or a generic one
+ 
   const message = err.message || 'Internal Server Error';
 
-  console.error(err.stack); // Log the full error stack for debugging
+  console.error(err.stack); 
 
   // Send a JSON response to the client
   res.status(statusCode).json({

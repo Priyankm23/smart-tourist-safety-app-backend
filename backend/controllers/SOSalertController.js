@@ -1,5 +1,6 @@
 const SosAlert = require('../models/SOSalert');
 const { logToBlockchain } = require('../services/blockchain.service');
+const {CustomError} = require('../middlewares/errorMiddleware');
 
 // @desc    Create a new SOS alert
 // @route   POST /api/sos
