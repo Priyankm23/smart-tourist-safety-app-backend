@@ -12,6 +12,7 @@ const { registerIDOnBlockchain } = require('../services/blockchainService');
 // @route   POST /api/auth/register/tourist
 exports.registerTourist = async (req, res, next) => {
   try {
+<<<<<<< HEAD
     const { username, email, password, firstName, lastName, country, phoneNumber, digitalId, photoUrl } = req.body;
     
     // Check for all required fields based on the schema
@@ -43,6 +44,57 @@ exports.registerTourist = async (req, res, next) => {
       throw new CustomError(400, 'Username or email already in use.');
     }
 
+=======
+    // Include all fields required by the User model
+    const {
+      digitalId,
+      username,
+      firstName,
+      lastName,
+      email,
+      password,
+      country,
+      photoUrl,
+    } = req.body;
+
+    // Validate presence of required fields to avoid Mongoose validation errors
+    if (
+      !digitalId ||
+      !username ||
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !country
+    ) {
+      return next(new CustomError(400, 'Please enter all required fields.'));
+    }
+
+    // Check for duplicates by digitalId, username or email
+    const existingUser = await User.findOne({
+      $or: [{ digitalId }, { username }, { email }],
+    });
+    if (existingUser) {
+      return next(
+        new CustomError(
+          400,
+          'A user with the provided digitalId, username, or email already exists.'
+        )
+      );
+    }
+
+    const newUser = new User({
+      digitalId,
+      username,
+      firstName,
+      lastName,
+      email,
+      password,
+      country,
+      photoUrl,
+    });
+
+>>>>>>> b109feecdb92cb56b67c2db9979249dd53152fcc
     await newUser.save();
 
     // Step 3: Register the digital ID on the blockchain and get the transaction hash
