@@ -60,6 +60,49 @@ npm start
 
 The server logs the startup message and attempts to connect to MongoDB (see `config/dbConnection.js`).
 
+## Docker
+You can build and run the backend as a Docker container or use `docker-compose` to run the backend together with MongoDB.
+
+1) Build the image locally (run from the `backend` folder):
+
+```powershell
+docker build -t tourist-backend:latest .
+```
+
+2) Run with a mounted `.env` (recommended for local dev):
+
+```powershell
+docker run --rm -p 3000:3000 `
+	-v ${PWD}\.env:/env/.env:ro `
+	-e APP_ENV_PATH=/env/.env `
+	--name tourist-backend `
+	tourist-backend:latest
+```
+
+3) Run with `docker-compose` (starts app + MongoDB):
+
+```powershell
+docker-compose up --build
+```
+
+Notes:
+- The image's entrypoint supports providing an env file at `/run/secrets/app_env` (useful with Docker secrets) or `/env/.env` (bind-mount). The entrypoint copies that file to the app root as `.env` before starting.
+- The compose file sets `DB_URL=mongodb://mongo:27017/tourist-safety` so the backend can connect to the `mongo` service.
+
+## Pulling from Docker Hub
+If you pushed an image to Docker Hub , you can pull and run it directly:
+
+```powershell
+docker pull redrepter/tourist-backend:latest
+docker run --rm -p 3000:3000 `
+	-e PORT=3000 `
+	-e DB_URL="mongodb://host:27017/tourist-safety" `
+	--name tourist-backend `
+	redrepter/tourist-backend:latest
+```
+
+Or with a mounted `.env` as above (set `APP_ENV_PATH=/env/.env`).
+
 ## API (high level)
 The app mounts these routers in `app.js`:
 

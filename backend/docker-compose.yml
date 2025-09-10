@@ -6,12 +6,13 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - DB_URL=mongodb://mongo:27017/tourist-safety
-      - NODE_ENV=production
+      - APP_ENV_PATH=/env/.env
     depends_on:
       - mongo
     volumes:
       - ./:/usr/src/app:cached
+      - ./.env:/env/.env:ro
+    restart: unless-stopped
 
   mongo:
     image: mongo:6.0
