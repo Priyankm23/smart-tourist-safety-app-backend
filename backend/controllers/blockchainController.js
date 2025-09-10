@@ -1,14 +1,15 @@
 const { ethers } = require("ethers");
 const { getJson } = require("ethers/lib/utils");
 const { SosAlert } = require('../models/SOSalert');
+const { SMART_CONTRACT_ADDRESS , PRIVATE_KEY , POLYGON_RPC_URL } = require('../config/config');
 
 // The smart contract ABI from compilation
 const contractABI = require('../../abi/SosContract.json'); 
-const contractAddress = process.env.SMART_CONTRACT_ADDRESS;
+const contractAddress = SMART_CONTRACT_ADDRESS;
 
 // Initialize a provider and wallet
-const provider = new ethers.providers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const provider = new ethers.providers.JsonRpcProvider(POLYGON_RPC_URL);
+const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 
 // Create a contract instance
 const sosContract = new ethers.Contract(contractAddress, contractABI, wallet);

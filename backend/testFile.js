@@ -1,9 +1,6 @@
-const { ethers } =require("ethers");
-const {POLYGON_RPC,PRIVATE_KEY,SMART_CONTRACT_ADDRESS } = require('../config/config')
-
-const RPC_URL = POLYGON_RPC;
-const CONTRACT_ADDRESS = SMART_CONTRACT_ADDRESS;
-const ABI = [
+const { ethers } = require("ethers");
+const { POLYGON_RPC,SMART_CONTRACT_ADDRESS,PRIVATE_KEY} = require('./config/config');
+const contractABI = [
 	{
 		"anonymous": false,
 		"inputs": [
@@ -108,33 +105,31 @@ const ABI = [
 	}
 ]
 
-const provider = new ethers.JsonRpcProvider(RPC_URL);
+const provider = new ethers.JsonRpcProvider(POLYGON_RPC);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
+const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS, contractABI, wallet);
 
-exports.storeAuditRecord=async(eventId, payloadHash)=> {
+async function storeAuditRecord(eventIdBytes32, payloadHashBytes32) {
   try {
-    console.log("📤 Calling storeEvent with:", { eventId, payloadHash });
-    const tx = await contract.storeEvent(eventId, payloadHash);
+    console.log("📌 Storing record on-chain...");
+    console.log("eventId:", eventIdBytes32);
+    console.log("payload:", payloadHashBytes32);
 
-    console.log("⏳ Waiting for tx to confirm...");
+    console.log(eventIdBytes32.length); // should be 66
+    console.log(payloadHashBytes32.length);
+
+    const tx = await contract.storeAuditRecord(eventIdBytes32, payloadHashBytes32);
+    console.log("TX sent:", tx);
+
     const receipt = await tx.wait();
+    console.log("TX mined:", receipt);
 
-	const txHash = receipt.transactionHash || receipt.hash;
-    console.log("✅ Tx mined:", txHash);
-
-
-    return txHash || "failed-tx";	
+    // Ethers v6 fix
+    return receipt.hash || receipt.transactionHash;
   } catch (err) {
     console.error("❌ Blockchain tx failed:", err);
     return "failed-tx";
   }
 }
 
-exports.verifyAuditRecord=async(eventIdHex, payloadHashHex)=> {
-  return await contract.verify(eventIdHex, payloadHashHex);
-}
-
-exports.getRecord=async(eventIdHex)=> {
-  return await contract.getEvent(eventIdHex);
-}
+module.exports = { storeAuditRecord };

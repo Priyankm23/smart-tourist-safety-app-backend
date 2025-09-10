@@ -1,159 +1,133 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User'); 
-const Authority = require('../models/Authority'); 
-const { CustomError } = require('../middlewares/errorMiddleware');
-const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/config');
+const jwt = require("jsonwebtoken");
+const Tourist = require("../models/User.js");
+const bcrypt = require("bcryptjs");
+const { encrypt } = require("../utils/encrypt.js");
+const { sha256Hex } = require("../utils/hash.js");
+const { hex64ToBytes32 } = require("../utils/ethFormat.js");
+const blockchain = require("../services/blockchainService.js");
+const { v4: uuidv4 } = require("uuid");
 
-// Import the blockchain service
-const { registerIDOnBlockchain } = require('../services/blockchainService');
-
-// @desc    Register a new user (tourist)
-// @route   POST /api/auth/register/tourist
-exports.registerTourist = async (req, res, next) => {
+exports.registerTourist=async(req, res)=> {
   try {
-<<<<<<< HEAD
-    const { username, email, password, firstName, lastName, country, phoneNumber, digitalId, photoUrl } = req.body;
-    
-    // Check for all required fields based on the schema
-    if (!username || !email || !password || !firstName || !lastName || !country || !phoneNumber || !digitalId) {
-      throw new CustomError(400, 'Please enter all required fields.');
+    const { name, govId, phone, email, itinerary, emergencyContact,password, language, tripEndDate } = req.body;
+
+    // basic validation
+    if (!name || !govId || !phone || !emergencyContact || !password) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Step 1: Check if the digital ID is already registered on the blockchain
-    const isRegisteredOnChain = await registerIDOnBlockchain(digitalId);
-    if (isRegisteredOnChain) {
-      throw new CustomError(400, 'Digital ID already registered on-chain.');
-    }
+    // Generate internal touristId
+    const touristId = "T" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 999);
 
-    // Step 2: Save user PII to the database. Do NOT save the digitalId directly.
-    const newUser = new User({ 
-      username, 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      country, 
-      phoneNumber,
-      photoUrl 
-    });
-    
-    // Check if a user with the same username or email already exists
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser) {
-      throw new CustomError(400, 'Username or email already in use.');
-    }
+    // Encrypt sensitive fields
+    const nameEnc = encrypt(name);
+    const phoneEnc = encrypt(phone);
+    const emailEnc = email ? encrypt(email) : null;
+    const itineraryEnc = itinerary ? encrypt(JSON.stringify(itinerary)) : null;
+    const emergencyEnc = encrypt(JSON.stringify(emergencyContact));
 
-=======
-    // Include all fields required by the User model
-    const {
-      digitalId,
-      username,
-      firstName,
-      lastName,
-      email,
-      password,
-      country,
-      photoUrl,
-    } = req.body;
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
+    // Create a one-way hash of government id (salted)
+    const govSalt = process.env.GOVID_SALT || "static-salt-for-dev"; // in production use per-record random salt stored encrypted or KMS
+    const govIdHash = sha256Hex(govId + govSalt);
 
-    // Validate presence of required fields to avoid Mongoose validation errors
-    if (
-      !digitalId ||
-      !username ||
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !country
-    ) {
-      return next(new CustomError(400, 'Please enter all required fields.'));
-    }
+    // Build payload for on-chain audit (string concatenation in deterministic order)
+    const payload = `${touristId}|${govIdHash}|${sha256Hex(JSON.stringify(itinerary || ""))}|${new Date().toISOString()}`;
+    const payloadHash = sha256Hex(payload); // 64-char hex
 
-    // Check for duplicates by digitalId, username or email
-    const existingUser = await User.findOne({
-      $or: [{ digitalId }, { username }, { email }],
-    });
-    if (existingUser) {
-      return next(
-        new CustomError(
-          400,
-          'A user with the provided digitalId, username, or email already exists.'
-        )
-      );
-    }
-
-    const newUser = new User({
-      digitalId,
-      username,
-      firstName,
-      lastName,
-      email,
-      password,
-      country,
-      photoUrl,
+    // Save in DB
+    const tourist = new Tourist({
+      touristId,
+      nameEncrypted: nameEnc,
+      govIdHash,
+      phoneEncrypted: phoneEnc,
+      emailEncrypted: emailEnc,
+      emailForLogin: email, 
+      itineraryEncrypted: itineraryEnc,
+      emergencyContactEncrypted: emergencyEnc,
+      passwordHash,  
+      language: language || "en",
+      safetyScore: 100,
+      consent: { tracking: false, dataRetention: true },
+      createdAt: new Date(),
+      expiresAt: tripEndDate ? new Date(tripEndDate) : null,
+      audit: { regHash: payloadHash }
     });
 
->>>>>>> b109feecdb92cb56b67c2db9979249dd53152fcc
-    await newUser.save();
+    await tourist.save();
 
-    // Step 3: Register the digital ID on the blockchain and get the transaction hash
-    // We pass the blockchain-registered digitalId to the blockchain service
-    const blockchainTx = await registerIDOnBlockchain(digitalId);
+    // Push to blockchain (store event)
+    // Create an eventId (use uuid + touristId) then convert to bytes32 via sha256
+    const eventIdRaw = uuidv4() + "|" + touristId;
+    const eventIdHash = sha256Hex(eventIdRaw);
+    const eventIdBytes32 = hex64ToBytes32(eventIdHash);
+    const payloadHashBytes32 = hex64ToBytes32(payloadHash);
 
-    // Save the blockchain transaction hash to the database for audit trail.
-    await User.findByIdAndUpdate(newUser._id, { 'blockchainTxHash': blockchainTx.hash });
+    let txHash;
+    try {
+      txHash = await blockchain.storeAuditRecord(eventIdBytes32, payloadHashBytes32);
+    } catch (err) {
+      console.error("Blockchain tx failed:", err);
+      txHash = null; // or keep undefined
+    }
 
-    res.status(201).json({ 
-      message: 'Tourist registered successfully.',
-      blockchainTxHash: blockchainTx.hash
+    tourist.audit.regTxHash = txHash || "not-recorded";
+    await tourist.save();
+
+    return res.status(201).json({
+      touristId,
+      message: "Registered. Digital ID created.",
+      audit: {
+        regHash: payloadHash,
+        regTxHash: txHash,
+        eventId: eventIdHash,
+      },
     });
-
   } catch (err) {
-    next(err);
+    console.error("registerTourist error", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
-};
+}
 
-// @desc    Login a user (tourist or authority)
-// @route   POST /api/auth/login
-exports.login = async (req, res, next) => {
+exports.loginTourist = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
-    if (!email || !password || !role) {
-      throw new CustomError(400, 'Please provide email, password, and role.');
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
     }
 
-    let foundUser;
-    if (role === 'tourist') {
-      foundUser = await User.findOne({ email });
-    } else if (role === 'authority') {
-      foundUser = await Authority.findOne({ email });
-    } else {
-      throw new CustomError(400, 'Invalid role.');
+    // Find tourist by email
+    const tourist = await Tourist.findOne({ emailForLogin: email });
+    if (!tourist) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    if (!foundUser) {
-      throw new CustomError(401, 'Invalid credentials.');
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, tourist.passwordHash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const isMatch = await bcrypt.compare(password, foundUser.password);
-    if (!isMatch) {
-      throw new CustomError(401, 'Invalid credentials.');
-    }
-
-    const payload = { 
-      id: foundUser._id,
-      role: foundUser.role,
-      // The digitalId is not in the DB, so we don't include it here
+    // ✅ Generate JWT
+    const payload = {
+      touristId: tourist.touristId,
+      language: tourist.language
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN,
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "2h",
     });
 
-    res.json({ token, user: payload });
+    return res.status(200).json({
+      message: "Login successful",
+      touristId: tourist.touristId,
+      token
+    });
+
   } catch (err) {
-    next(err);
+    console.error("loginTourist error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };

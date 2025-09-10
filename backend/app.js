@@ -28,6 +28,7 @@ app.use('/api/authority', authorityRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/geofence', geofenceRoutes);
 
+
 // === Server Start ===
 httpServer.listen(PORT, async() => {
   console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);

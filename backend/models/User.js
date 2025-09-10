@@ -1,60 +1,30 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); // A library to hash passwords
+// backend/models/Tourist.js
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
-const userSchema = new mongoose.Schema({
-  // Personal & Temporary Trip Details
-  username: { type: String, required: true, unique: true, trim: true },
-  email: { type: String, required: true, unique: true, trim: true },
-  password: { type: String, required: true },
-  firstName: { type: String, required: true, trim: true },
-  lastName: { type: String, required: true, trim: true },
-  country: { type: String, required: true },
-  photoUrl: {
-    type: String,
-    // This will store the Cloudinary URL for the user's photo.
+const TouristSchema = new mongoose.Schema({
+  touristId: { type: String, required: true, unique: true }, // internal id like T1001
+  nameEncrypted: { type: String, required: true },           // AES encrypted
+  govIdHash: { type: String, required: true },               // SHA256 hash of Aadhaar/passport
+  phoneEncrypted: { type: String, required: true },          // AES encrypted
+  emailEncrypted: { type: String },                          // AES encrypted
+  emailForLogin: { type: String, required: true, unique: true },
+  itineraryEncrypted: { type: String },                      // AES encrypted
+  emergencyContactEncrypted: { type: String },               // AES encrypted
+  passwordHash: { type: String, required: true },            // bcrypt hashed password
+  language: { type: String, default: "en" },
+  safetyScore: { type: Number, default: 100 },               // initial tourist safety score
+  consent: {
+    tracking: { type: Boolean, default: false },
+    dataRetention: { type: Boolean, default: true }
   },
-  
-  // Temporary Tourist ID for the duration of the trip
-  touristId: {
-    type: String,
-    unique: true,
-    sparse: true, // Allows for some documents to not have this field
-    // This ID is generated upon trip start and removed upon trip end.
-  },
-
-  // Blockchain-backed Digital ID (Immutable & Public)
-  digitalId: {
-    type: String,
-    required: true,
-    unique: true,
-    immutable: true,
-    index: true,
-  },
-
-  // Location & Status
-  currentLocation: {
-    latitude: { type: Number },
-    longitude: { type: Number },
-    timestamp: { type: Date },
-  },
-  isVerified: { type: Boolean, default: false },
-  isActive: { type: Boolean, default: true },
-  role: { type: String, enum: ['tourist'], default: 'tourist' },
   createdAt: { type: Date, default: Date.now },
-});
-
-// Mongoose Pre-Save Hook for Password Hashing
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (err) {
-    next(err);
+  expiresAt: { type: Date },       // end of trip
+  audit: {
+    regHash: { type: String },     // SHA256 hash that was written to blockchain
+    regTxHash: { type: String }    // blockchain tx hash
   }
 });
 
-module.exports = mongoose.model('User', userSchema);
+
+module.exports = mongoose.model("Tourist", TouristSchema);

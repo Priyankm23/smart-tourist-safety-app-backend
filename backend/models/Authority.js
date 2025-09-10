@@ -11,7 +11,7 @@ const authoritySchema = new mongoose.Schema({
     enum: ['police', 'higher-authority', 'admin'],
     required: true
   },
-  policeStationId: { type: String }, // Optional field for police officers
+  policeStationId: { type: String ,required: true}, // Optional field for police officers
   isActive: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now },
 });
