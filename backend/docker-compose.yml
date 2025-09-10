@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DB_URL=mongodb://mongo:27017/tourist-safety
+      - NODE_ENV=production
+    depends_on:
+      - mongo
+    volumes:
+      - ./:/usr/src/app:cached
+
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
