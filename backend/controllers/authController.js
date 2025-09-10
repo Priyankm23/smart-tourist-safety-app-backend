@@ -9,17 +9,55 @@ const {JWT_SECRET,JWT_EXPIRES_IN} = require('../config/config');
 // @route   POST /api/auth/register/tourist
 exports.registerTourist = async (req, res, next) => {
   try {
-    const { digitalId, firstName, lastName, email, password } = req.body;
-    if (!digitalId || !firstName || !email || !password) {
-      return next(new CustomError(400, 'Please enter all fields.'));
+    // Include all fields required by the User model
+    const {
+      digitalId,
+      username,
+      firstName,
+      lastName,
+      email,
+      password,
+      country,
+      photoUrl,
+    } = req.body;
+
+    // Validate presence of required fields to avoid Mongoose validation errors
+    if (
+      !digitalId ||
+      !username ||
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !country
+    ) {
+      return next(new CustomError(400, 'Please enter all required fields.'));
     }
 
-    const existingUser = await User.findOne({ digitalId });
+    // Check for duplicates by digitalId, username or email
+    const existingUser = await User.findOne({
+      $or: [{ digitalId }, { username }, { email }],
+    });
     if (existingUser) {
-      return next(new CustomError(400, 'Digital ID already registered.'));
+      return next(
+        new CustomError(
+          400,
+          'A user with the provided digitalId, username, or email already exists.'
+        )
+      );
     }
 
-    const newUser = new User({ digitalId, firstName, lastName, email, password });
+    const newUser = new User({
+      digitalId,
+      username,
+      firstName,
+      lastName,
+      email,
+      password,
+      country,
+      photoUrl,
+    });
+
     await newUser.save();
 
     res.status(201).json({ message: 'Tourist registered successfully.' });
