@@ -4,6 +4,6 @@ const { verifyToken } = require('../middlewares/authMiddleware');
 
 const router  = express.Router();
 
-router.post('/trigger',triggerSOS);
+router.post('/trigger',verifyToken,triggerSOS);
 
 module.exports = router;

@@ -1,4 +1,4 @@
-    const socketio = require('socket.io');
+const socketio = require('socket.io');
 const { handleSOSFallback } = require('./fallbackService');
 const { logAlertToBlockchain } = require('./blockchainService');
 

@@ -126,10 +126,11 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
  */
 exports.triggerSOS = async (req, res) => {
   try {
-    const { touristId, location, safetyScore, locationName, sosReason } = req.body;
+    const { location, safetyScore, locationName, sosReason } = req.body;
+	const touristId = req.user.touristId;
 
     // 1. Get tourist details
-    const tourist = await Tourist.findOne({ _id: touristId });
+    const tourist = await Tourist.findOne({ touristId });
     if (!tourist) {
       return res.status(404).json({ error: "Tourist not found" });
     }
@@ -146,7 +147,7 @@ exports.triggerSOS = async (req, res) => {
     console.log(emergencyContact);
         
     const sosAlert = new SOSAlert({
-      touristId,
+      touristId: tourist._id,
       location,
       safetyScore,
       locationName,

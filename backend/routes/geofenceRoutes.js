@@ -1,10 +1,13 @@
 const express = require('express');
-const { receiveGeofenceTransitions } = require('../controllers/geofenceController');
-const { verifyToken: protect } = require('../middlewares/authMiddleware');
+const { receiveGeofenceTransitions ,createGeoFenceToDangerLocation, getallZones, getZonebyId} = require('../controllers/geofenceController');
+const { verifyToken } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 // Route to receive geofence transitions from the tourist app
-router.post('/transitions', protect, receiveGeofenceTransitions);
+router.post('/transitions', verifyToken, receiveGeofenceTransitions);
+router.post('/zone',verifyToken,createGeoFenceToDangerLocation);
+router.get('/',verifyToken,getallZones);
+router.get('/:id',verifyToken,getZonebyId);
 
 module.exports = router;

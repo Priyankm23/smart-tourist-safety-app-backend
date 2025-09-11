@@ -20,7 +20,10 @@ realTimeService.init(httpServer);
 
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json({
+  strict: true, // ensures invalid JSON is rejected
+  limit: '1mb'
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tourist', touristRoutes);
