@@ -4,12 +4,6 @@ This backend provides APIs for managing tourist registration, login, and retriev
 
 ---
 
-# Smart Tourist Safety Monitoring - Backend API Documentation
-
-This backend provides APIs for managing tourist registration, login, SOS alerts, and danger zones. All sensitive data is encrypted or hashed for security, and blockchain integration is used for audit purposes.
-
----
-
 ## 1. Register Tourist
 
 **Endpoint:**
