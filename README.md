@@ -4,6 +4,12 @@ This backend provides APIs for managing tourist registration, login, and retriev
 
 ---
 
+# Smart Tourist Safety Monitoring - Backend API Documentation
+
+This backend provides APIs for managing tourist registration, login, SOS alerts, and danger zones. All sensitive data is encrypted or hashed for security, and blockchain integration is used for audit purposes.
+
+---
+
 ## 1. Register Tourist
 
 **Endpoint:**
@@ -11,9 +17,6 @@ This backend provides APIs for managing tourist registration, login, and retriev
 ```
 POST /auth/register
 ```
-
-**Description:**
-Registers a new tourist and creates a digital ID. Sensitive fields are encrypted, and a blockchain audit record is created.
 
 **Request Body:**
 
@@ -55,9 +58,6 @@ Registers a new tourist and creates a digital ID. Sensitive fields are encrypted
 POST /auth/login
 ```
 
-**Description:**
-Authenticates a tourist using email and password and returns a JWT token.
-
 **Request Body:**
 
 ```json
@@ -86,9 +86,6 @@ Authenticates a tourist using email and password and returns a JWT token.
 ```
 GET /tourist/:touristId
 ```
-
-**Description:**
-Retrieves the decrypted tourist information for the given `touristId`. Requires authentication via JWT token.
 
 **Headers:**
 
@@ -119,6 +116,226 @@ Authorization: Bearer <jwt-token>
 ```
 
 ---
+
+## 4. Trigger SOS Alert
+
+**Endpoint:**
+
+```
+POST /sos/trigger
+```
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "location": {
+    "coordinates": [80.1833, 16.3067],
+    "locationName": "Andhra Pradesh Coast"
+  },
+  "safetyScore": 85,
+  "sosReason": {
+    "reason": "Cyclone warning",
+    "weatherInfo": "Heavy rain expected",
+    "extra": "Move to safer zone immediately"
+  }
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "success": true,
+  "message": "SOS alert triggered successfully",
+  "sosAlert": {
+    "id": "68c305fa481b6fc794e62b70",
+    "status": "new",
+    "location": {
+      "coordinates": [80.1833, 16.3067],
+      "locationName": "Andhra Pradesh Coast"
+    },
+    "timestamp": "2025-09-11T17:25:14.757Z",
+    "blockchainTxHash": "0x123abc456..."
+  }
+}
+```
+
+---
+
+## 5. Get New SOS Alerts
+
+**Endpoint:**
+
+```
+GET /sos/alerts
+```
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "id": "68c305fa481b6fc794e62b70",
+    "touristId": "68c2c68bd03e438eca88fa4f",
+    "status": "new",
+    "location": {
+      "coordinates": [80.1833, 16.3067],
+      "locationName": "Andhra Pradesh Coast"
+    },
+    "safetyScore": 85,
+    "sosReason": {
+      "reason": "Cyclone warning",
+      "weatherInfo": "Heavy rain expected",
+      "extra": "Move to safer zone immediately"
+    },
+    "emergencyContact": {
+      "name": "Jane Doe",
+      "phone": "9876543211"
+    },
+    "timestamp": "2025-09-11T17:25:14.757Z",
+    "isLoggedOnChain": true,
+    "blockchainTxHash": "0x123abc456..."
+  }
+]
+```
+
+---
+
+## 6. Danger Zones (Geo-Fencing)
+
+### a) Create Danger Zone
+
+**Endpoint:**
+
+```
+POST /zone
+```
+
+**Request Body:**
+
+```json
+{
+  "id": "disaster-0",
+  "name": "Andhra Pradesh Coast",
+  "type": "circle",
+  "coords": [16.3067, 80.1833],
+  "radiusKm": 5,
+  "category": "Natural Disaster Risk Area",
+  "state": "Andhra Pradesh",
+  "riskLevel": "Very High",
+  "source": "India Meteorological Department",
+  "raw": {
+    "Name": "Andhra Pradesh Coast",
+    "Category": "Natural Disaster Risk Area",
+    "Sub_Category": "Cyclone Zone",
+    "State": "Andhra Pradesh",
+    "Latitude": "16.3067",
+    "Longitude": "80.1833",
+    "Area_km2": "",
+    "Year_Established": "",
+    "Source": "India Meteorological Department",
+    "Additional_Info": "Risk Level: Very High"
+  }
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "success": true,
+  "message": "Danger zone created successfully",
+  "zone": {
+    "id": "disaster-0",
+    "name": "Andhra Pradesh Coast",
+    "type": "circle",
+    "coords": [16.3067, 80.1833],
+    "radiusKm": 5,
+    "category": "Natural Disaster Risk Area",
+    "state": "Andhra Pradesh",
+    "riskLevel": "Very High",
+    "source": "India Meteorological Department"
+  }
+}
+```
+
+### b) Get All Danger Zones
+
+**Endpoint:**
+
+```
+GET /zone
+```
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "id": "disaster-0",
+    "name": "Andhra Pradesh Coast",
+    "type": "circle",
+    "coords": [16.3067, 80.1833],
+    "radiusKm": 5,
+    "category": "Natural Disaster Risk Area",
+    "state": "Andhra Pradesh",
+    "riskLevel": "Very High",
+    "source": "India Meteorological Department"
+  }
+]
+```
+
+### c) Get Danger Zone By ID
+
+**Endpoint:**
+
+```
+GET /zone/:id
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "id": "disaster-0",
+  "name": "Andhra Pradesh Coast",
+  "type": "circle",
+  "coords": [16.3067, 80.1833],
+  "radiusKm": 5,
+  "category": "Natural Disaster Risk Area",
+  "state": "Andhra Pradesh",
+  "riskLevel": "Very High",
+  "source": "India Meteorological Department",
+  "raw": {
+    "Name": "Andhra Pradesh Coast",
+    "Category": "Natural Disaster Risk Area",
+    "Sub_Category": "Cyclone Zone",
+    "State": "Andhra Pradesh",
+    "Latitude": "16.3067",
+    "Longitude": "80.1833",
+    "Area_km2": "",
+    "Year_Established": "",
+    "Source": "India Meteorological Department",
+    "Additional_Info": "Risk Level: Very High"
+  }
+}
+
+```
+
 
 ## Notes
 
