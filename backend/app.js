@@ -8,7 +8,7 @@ const connectDB = require('./config/dbConnection');
 const authRoutes = require('./routes/authRoutes');
 const touristRoutes = require('./routes/touristRoutes');
 const authorityRoutes = require('./routes/authorityRoutes');
-const blockchainRoutes = require('./routes/blockchainRoutes');
+const sosRoutes = require('./routes/sosRoutes');
 const realTimeService = require('./services/realtimeService');
 const geofenceRoutes = require('./routes/geofenceRoutes');
 
@@ -25,9 +25,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/tourist', touristRoutes);
 app.use('/api/authority', authorityRoutes);
-app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/geofence', geofenceRoutes);
-
+app.use('/api/sos',sosRoutes);
 
 // === Server Start ===
 httpServer.listen(PORT, async() => {

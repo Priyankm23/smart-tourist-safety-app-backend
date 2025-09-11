@@ -1,14 +1,12 @@
 // backend/models/Tourist.js
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 
 const TouristSchema = new mongoose.Schema({
   touristId: { type: String, required: true, unique: true }, // internal id like T1001
   nameEncrypted: { type: String, required: true },           // AES encrypted
   govIdHash: { type: String, required: true },               // SHA256 hash of Aadhaar/passport
   phoneEncrypted: { type: String, required: true },          // AES encrypted
-  emailEncrypted: { type: String },                          // AES encrypted
-  emailForLogin: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
   itineraryEncrypted: { type: String },                      // AES encrypted
   emergencyContactEncrypted: { type: String },               // AES encrypted
   passwordHash: { type: String, required: true },            // bcrypt hashed password
@@ -22,9 +20,11 @@ const TouristSchema = new mongoose.Schema({
   expiresAt: { type: Date },       // end of trip
   audit: {
     regHash: { type: String },     // SHA256 hash that was written to blockchain
-    regTxHash: { type: String }    // blockchain tx hash
+    regTxHash: { type: String },    // blockchain tx hash
+    eventId: {type: String},
+    itineraryHash: {type : String},
+    registeredAtIso: {type: String}
   }
 });
-
 
 module.exports = mongoose.model("Tourist", TouristSchema);

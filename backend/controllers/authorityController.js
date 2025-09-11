@@ -1,5 +1,4 @@
 const SosAlert = require('../models/SOSalert');
-const Log = require('../models/Logs');
 const { CustomError } = require('../middlewares/errorMiddleware');
 
 // @desc    Get all open SOS alerts

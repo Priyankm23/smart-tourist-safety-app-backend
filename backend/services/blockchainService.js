@@ -1,8 +1,8 @@
 const { ethers } =require("ethers");
-const {POLYGON_RPC,PRIVATE_KEY,SMART_CONTRACT_ADDRESS } = require('../config/config')
+const {POLYGON_RPC,PRIVATE_KEY,SMART_CONTRACT_ADDRESS_reg } = require('../config/config')
 
 const RPC_URL = POLYGON_RPC;
-const CONTRACT_ADDRESS = SMART_CONTRACT_ADDRESS;
+const CONTRACT_ADDRESS = SMART_CONTRACT_ADDRESS_reg;
 const ABI = [
 	{
 		"anonymous": false,
@@ -112,29 +112,62 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
-exports.storeAuditRecord=async(eventId, payloadHash)=> {
+/**
+ * Store an audit record on blockchain
+ * @param {string} eventIdBytes32 - 0x-prefixed 32-byte hex
+ * @param {string} payloadHashBytes32 - 0x-prefixed 32-byte hex
+ * @returns {string} txHash
+ */
+exports.storeEvent = async (eventIdBytes32, payloadHashBytes32) => {
   try {
-    console.log("📤 Calling storeEvent with:", { eventId, payloadHash });
-    const tx = await contract.storeEvent(eventId, payloadHash);
+    console.log("📌 Blockchain storeEvent input:", { eventIdBytes32, payloadHashBytes32 });
 
-    console.log("⏳ Waiting for tx to confirm...");
+    const tx = await contract.storeEvent(eventIdBytes32, payloadHashBytes32);
     const receipt = await tx.wait();
 
-	const txHash = receipt.transactionHash || receipt.hash;
-    console.log("✅ Tx mined:", txHash);
-
-
-    return txHash || "failed-tx";	
+    console.log("✅ Tx mined:", receipt.hash);
+    return receipt.hash;
   } catch (err) {
     console.error("❌ Blockchain tx failed:", err);
-    return "failed-tx";
+    throw err;
   }
-}
+};
 
-exports.verifyAuditRecord=async(eventIdHex, payloadHashHex)=> {
-  return await contract.verify(eventIdHex, payloadHashHex);
-}
+/**
+ * Verify a record on blockchain
+ * @param {string} eventIdBytes32 - 0x-prefixed 32-byte hex
+ * @param {string} payloadHashBytes32 - 0x-prefixed 32-byte hex
+ * @returns {boolean}
+ */
+exports.verifyAuditRecord = async (eventIdBytes32, payloadHashBytes32) => {
+  try {
+    console.log("📌 Blockchain verify input:", { eventIdBytes32, payloadHashBytes32 });
 
-exports.getRecord=async(eventIdHex)=> {
-  return await contract.getEvent(eventIdHex);
-}
+    const ok = await contract.verify(eventIdBytes32, payloadHashBytes32);
+    console.log("✅ Verify result:", ok);
+    return ok;
+  } catch (err) {
+    console.error("❌ Blockchain verify failed:", err);
+    throw err;
+  }
+};
+
+/**
+ * Fetch stored record from blockchain
+ * @param {string} eventIdBytes32 - 0x-prefixed 32-byte hex
+ * @returns {object} { payloadHash, timestamp, issuer }
+ */
+exports.getEvent = async (eventIdBytes32) => {
+  try {
+    const record = await contract.getEvent(eventIdBytes32);
+    return {
+      payloadHash: record[0],
+      timestamp: Number(record[1]),
+      issuer: record[2]
+    };
+  } catch (err) {
+    console.error("❌ Blockchain getEvent failed:", err);
+    throw err;
+  }
+};	
+

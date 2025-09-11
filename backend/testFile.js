@@ -1,6 +1,5 @@
 const { ethers } = require("ethers");
-const { POLYGON_RPC,SMART_CONTRACT_ADDRESS,PRIVATE_KEY} = require('./config/config');
-const contractABI = [
+const ABI = [
 	{
 		"anonymous": false,
 		"inputs": [
@@ -104,32 +103,22 @@ const contractABI = [
 		"type": "function"
 	}
 ]
-
+const {POLYGON_RPC,SMART_CONTRACT_ADDRESS} = require('./config/config')
 const provider = new ethers.JsonRpcProvider(POLYGON_RPC);
-const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS, contractABI, wallet);
+const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS, ABI, provider);
 
-async function storeAuditRecord(eventIdBytes32, payloadHashBytes32) {
-  try {
-    console.log("📌 Storing record on-chain...");
-    console.log("eventId:", eventIdBytes32);
-    console.log("payload:", payloadHashBytes32);
+async function inspectOnChain(eventIdHexNo0x) {
+  // ensure 0x prefix
+  const eventIdHex = eventIdHexNo0x.startsWith("0x") ? eventIdHexNo0x : "0x" + eventIdHexNo0x;
+  console.log("eventIdHex:", eventIdHex);
 
-    console.log(eventIdBytes32.length); // should be 66
-    console.log(payloadHashBytes32.length);
-
-    const tx = await contract.storeAuditRecord(eventIdBytes32, payloadHashBytes32);
-    console.log("TX sent:", tx);
-
-    const receipt = await tx.wait();
-    console.log("TX mined:", receipt);
-
-    // Ethers v6 fix
-    return receipt.hash || receipt.transactionHash;
-  } catch (err) {
-    console.error("❌ Blockchain tx failed:", err);
-    return "failed-tx";
-  }
+  // call getEvent
+  const rec = await contract.getEvent(eventIdHex);
+  // rec[0] likely a bytes32 hex string (0x...)
+  console.log("on-chain payloadHash (raw):", rec[0]);
+  console.log("on-chain payloadHash (hex):", ethers.hexlify(rec[0]));
+  console.log("on-chain timestamp:", rec[1].toString());
+  console.log("on-chain issuer:", rec[2]);
 }
 
-module.exports = { storeAuditRecord };
+inspectOnChain("a429333917e02b3bb370863b92f0fb361d24d5d70d80c514b03742f262dd5b56").catch(console.error);

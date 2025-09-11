@@ -6,13 +6,14 @@ const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const blockchain = require("../services/blockchainService.js");
 const { v4: uuidv4 } = require("uuid");
+const { JWT_SECRET , JWT_EXPIRES_IN} = require("../config/config")
 
-exports.registerTourist=async(req, res)=> {
+exports.registerTourist = async (req, res) => {
   try {
-    const { name, govId, phone, email, itinerary, emergencyContact,password, language, tripEndDate } = req.body;
+    const { name, govId, phone, email, itinerary, emergencyContact, password, language, tripEndDate } = req.body;
 
-    // basic validation
-    if (!name || !govId || !phone || !emergencyContact || !password) {
+    // Basic validation
+    if (!name || !govId || !phone || !emergencyContact || !password || !email) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -22,43 +23,43 @@ exports.registerTourist=async(req, res)=> {
     // Encrypt sensitive fields
     const nameEnc = encrypt(name);
     const phoneEnc = encrypt(phone);
-    const emailEnc = email ? encrypt(email) : null;
     const itineraryEnc = itinerary ? encrypt(JSON.stringify(itinerary)) : null;
     const emergencyEnc = encrypt(JSON.stringify(emergencyContact));
 
+    // Password hashing
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
-    // Create a one-way hash of government id (salted)
-    const govSalt = process.env.GOVID_SALT || "static-salt-for-dev"; // in production use per-record random salt stored encrypted or KMS
+
+    // Government ID hash
+    const govSalt = process.env.GOVID_SALT || "static-salt-for-dev";
     const govIdHash = sha256Hex(govId + govSalt);
 
-    // Build payload for on-chain audit (string concatenation in deterministic order)
-    const payload = `${touristId}|${govIdHash}|${sha256Hex(JSON.stringify(itinerary || ""))}|${new Date().toISOString()}`;
-    const payloadHash = sha256Hex(payload); // 64-char hex
+    // Deterministic fields for blockchain/audit
+    const registeredAtIso = new Date().toISOString();
+    const itineraryHash = sha256Hex(JSON.stringify(itinerary || ""));
+    const payload = `${touristId}|${govIdHash}|${itineraryHash}|${registeredAtIso}`;
+    const payloadHash = sha256Hex(payload);
 
-    // Save in DB
+    // Create Tourist record
     const tourist = new Tourist({
       touristId,
       nameEncrypted: nameEnc,
       govIdHash,
       phoneEncrypted: phoneEnc,
-      emailEncrypted: emailEnc,
-      emailForLogin: email, 
+      email, // plain email for login
       itineraryEncrypted: itineraryEnc,
       emergencyContactEncrypted: emergencyEnc,
-      passwordHash,  
+      passwordHash,
       language: language || "en",
       safetyScore: 100,
       consent: { tracking: false, dataRetention: true },
       createdAt: new Date(),
       expiresAt: tripEndDate ? new Date(tripEndDate) : null,
-      audit: { regHash: payloadHash }
     });
 
     await tourist.save();
 
-    // Push to blockchain (store event)
-    // Create an eventId (use uuid + touristId) then convert to bytes32 via sha256
+    // Blockchain push
     const eventIdRaw = uuidv4() + "|" + touristId;
     const eventIdHash = sha256Hex(eventIdRaw);
     const eventIdBytes32 = hex64ToBytes32(eventIdHash);
@@ -66,13 +67,21 @@ exports.registerTourist=async(req, res)=> {
 
     let txHash;
     try {
-      txHash = await blockchain.storeAuditRecord(eventIdBytes32, payloadHashBytes32);
+      txHash = await blockchain.storeEvent(eventIdBytes32, payloadHashBytes32); // match contract function name
+      console.log(txHash);
     } catch (err) {
       console.error("Blockchain tx failed:", err);
-      txHash = null; // or keep undefined
+      txHash = null;
     }
 
-    tourist.audit.regTxHash = txHash || "not-recorded";
+    tourist.audit = {
+      regHash: payloadHash,
+      regTxHash: txHash || "not-recorded",
+      eventId: eventIdHash,
+      itineraryHash: itineraryHash,
+      registeredAtIso: registeredAtIso
+    };
+
     await tourist.save();
 
     return res.status(201).json({
@@ -81,14 +90,15 @@ exports.registerTourist=async(req, res)=> {
       audit: {
         regHash: payloadHash,
         regTxHash: txHash,
-        eventId: eventIdHash,
-      },
+        eventId: eventIdHash
+      }
     });
+
   } catch (err) {
     console.error("registerTourist error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+};
 
 exports.loginTourist = async (req, res) => {
   try {
@@ -99,7 +109,7 @@ exports.loginTourist = async (req, res) => {
     }
 
     // Find tourist by email
-    const tourist = await Tourist.findOne({ emailForLogin: email });
+    const tourist = await Tourist.findOne({ email: email });
     if (!tourist) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
@@ -116,8 +126,8 @@ exports.loginTourist = async (req, res) => {
       language: tourist.language
     };
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: "2h",
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN
     });
 
     return res.status(200).json({
