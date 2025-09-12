@@ -9,7 +9,8 @@ const { decrypt } = require("../utils/encrypt.js");
 
 exports.getTouristById = async (req, res) => {
   try {
-    const { touristId } = req.params;
+    console.log(req.user.touristId);
+    const  touristId  = req.user.touristId;
 
     // Find tourist by touristId
     const tourist = await Tourist.findOne({ touristId });

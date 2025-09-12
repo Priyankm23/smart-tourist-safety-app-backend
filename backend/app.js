@@ -11,6 +11,7 @@ const authorityRoutes = require('./routes/authorityRoutes');
 const sosRoutes = require('./routes/sosRoutes');
 const realTimeService = require('./services/realtimeService');
 const geofenceRoutes = require('./routes/geofenceRoutes');
+const path = require("path"); 
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -24,6 +25,12 @@ app.use(express.json({
   strict: true, // ensures invalid JSON is rejected
   limit: '1mb'
 }));
+
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/heatmap", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "heatmap.html"));
+});
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tourist', touristRoutes);
