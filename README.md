@@ -9,7 +9,7 @@ This backend provides APIs for managing tourist registration, login, and retriev
 **Endpoint:**
 
 ```
-POST /auth/register
+POST /api/auth/register
 ```
 
 **Request Body:**
@@ -49,7 +49,7 @@ POST /auth/register
 **Endpoint:**
 
 ```
-POST /auth/login
+POST /api/auth/login
 ```
 
 **Request Body:**
@@ -78,7 +78,7 @@ POST /auth/login
 **Endpoint:**
 
 ```
-GET /tourist/:touristId
+GET /api/tourist/:touristId
 ```
 
 **Headers:**
@@ -116,7 +116,7 @@ Authorization: Bearer <jwt-token>
 **Endpoint:**
 
 ```
-POST /sos/trigger
+POST /api/sos/trigger
 ```
 
 **Headers:**
@@ -169,7 +169,7 @@ Content-Type: application/json
 **Endpoint:**
 
 ```
-GET /sos/alerts
+GET /api/authority/alerts
 ```
 
 **Headers:**
@@ -216,7 +216,7 @@ Authorization: Bearer <jwt-token>
 **Endpoint:**
 
 ```
-POST /zone
+POST /api/geofence/zone
 ```
 
 **Request Body:**
@@ -272,7 +272,7 @@ POST /zone
 **Endpoint:**
 
 ```
-GET /zone
+GET /api/geofence/
 ```
 
 **Response (200 OK):**
@@ -298,7 +298,7 @@ GET /zone
 **Endpoint:**
 
 ```
-GET /zone/:id
+GET /api/geofence/:id
 ```
 
 **Response (200 OK):**
