@@ -1,8 +1,10 @@
 const SOSAlert = require("../models/SOSalert.js");
 const { ethers } = require("ethers");
+const { v4: uuidv4 } = require("uuid");
+const { hex64ToBytes32 } = require('../utils/ethFormat.js');
 const { sha256Hex } = require("../utils/hash.js"); // your existing hash utility
 const { POLYGON_RPC, PRIVATE_KEY, SMART_CONTRACT_ADDRESS_sos } = require("../config/config.js");
-const Tourist = require('../models/User.js');
+const Tourist = require('../models/Tourist.js');
 const { decrypt } = require('../utils/encrypt.js');
 const SOSABI =  [
 	{
@@ -159,11 +161,15 @@ exports.triggerSOS = async (req, res) => {
     await sosAlert.save();
 	console.log(sosAlert);
 
+	const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
+    const eventIdHash = sha256Hex(eventIdRaw); // 64-char hex
+    const eventIdBytes32 = hex64ToBytes32(eventIdHash);
+
     // 2️⃣ Compute payload hash for blockchain (using bytes32)
     const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
     const payloadHash = ethers.id(payloadString); // keccak256
 
-    const alertId = ethers.id(sosAlert._id.toString());
+    const alertId = eventIdBytes32;
 
     console.log("📌 Logging SOS alert on-chain...");
     console.log("Alert ID:", alertId);

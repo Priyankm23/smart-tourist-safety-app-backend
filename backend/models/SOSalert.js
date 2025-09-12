@@ -42,8 +42,6 @@ const sosAlertSchema = new mongoose.Schema({
   // SOS reason and additional metadata
   sosReason: {
     reason: { type: String },
-    weatherInfo: { type: Object }, // can include temperature, conditions, etc.
-    extra: { type: Object } // any other relevant info
   },
 
   // Blockchain logging fields

@@ -8,6 +8,8 @@ const TouristSchema = new mongoose.Schema({
   phoneEncrypted: { type: String, required: true },          // AES encrypted
   email: { type: String, required: true, unique: true },
   itineraryEncrypted: { type: String },                      // AES encrypted
+  dayWiseItineraryEncrypted: { type: String }, // JSON of day-wise activities, AES encrypted
+  tripMembersEncrypted: { type: String },   // Names/relations of members traveling with tourist (AES encrypted)
   emergencyContactEncrypted: { type: String },               // AES encrypted
   passwordHash: { type: String, required: true },            // bcrypt hashed password
   language: { type: String, default: "en" },

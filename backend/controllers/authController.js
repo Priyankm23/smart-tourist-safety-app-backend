@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const Tourist = require("../models/User.js");
+const Tourist = require("../models/Tourist.js");
 const bcrypt = require("bcryptjs");
 const { encrypt } = require("../utils/encrypt.js");
 const { sha256Hex } = require("../utils/hash.js");
@@ -16,6 +16,14 @@ exports.registerTourist = async (req, res) => {
     if (!name || !govId || !phone || !emergencyContact || !password || !email) {
       return res.status(400).json({ error: "Missing required fields" });
     }
+
+    const existingTourist=await Tourist.findOne({email})
+
+        if(existingTourist){
+            const error=new Error('tourist already exists')
+            error.statusCode=409
+            throw error
+        }
 
     // Generate internal touristId
     const touristId = "T" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 999);
@@ -68,7 +76,10 @@ exports.registerTourist = async (req, res) => {
     let txHash;
     try {
       txHash = await blockchain.storeEvent(eventIdBytes32, payloadHashBytes32); // match contract function name
-      console.log(txHash);
+      if(txHash){
+        console.log("transaction hash returned correctly");
+      }
+     
     } catch (err) {
       console.error("Blockchain tx failed:", err);
       txHash = null;
@@ -96,6 +107,9 @@ exports.registerTourist = async (req, res) => {
 
   } catch (err) {
     console.error("registerTourist error", err);
+     if (err.statusCode && err.message) {
+      return res.status(err.statusCode).json({ error: err.message });
+    }
     return res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -1,4 +1,4 @@
-const Tourist = require("../models/User.js");
+const Tourist = require("../models/Tourist.js");
 const { CustomError } = require('../middlewares/errorMiddleware');
 const { decrypt } = require("../utils/encrypt.js");
 

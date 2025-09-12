@@ -1,4 +1,4 @@
-const Tourist = require("../models/User.js");
+const Tourist = require("../models/Tourist.js");
 const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const { decrypt } = require("../utils/encrypt.js");

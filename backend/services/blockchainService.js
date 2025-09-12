@@ -125,7 +125,10 @@ exports.storeEvent = async (eventIdBytes32, payloadHashBytes32) => {
     const tx = await contract.storeEvent(eventIdBytes32, payloadHashBytes32);
     const receipt = await tx.wait();
 
-    console.log("✅ Tx mined:", receipt.hash);
+	if(receipt.hash){
+		console.log("✅ Tx mined:");
+	}
+    
     return receipt.hash;
   } catch (err) {
     console.error("❌ Blockchain tx failed:", err);
