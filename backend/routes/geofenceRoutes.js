@@ -7,7 +7,7 @@ const router = express.Router();
 // Route to receive geofence transitions from the tourist app
 router.post('/transitions', verifyToken, receiveGeofenceTransitions);
 router.post('/zone',verifyToken,createGeoFenceToDangerLocation);
-router.get('/',verifyToken,getallZones);
+router.get('/',getallZones);
 router.get('/:id',verifyToken,getZonebyId);
 
 module.exports = router;

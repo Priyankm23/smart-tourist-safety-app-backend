@@ -18,7 +18,8 @@ const TouristSchema = new mongoose.Schema({
   safetyScore: { type: Number, default: 100 },               // initial tourist safety score
   consent: {
     tracking: { type: Boolean, default: false },
-    dataRetention: { type: Boolean, default: true }
+    dataRetention: { type: Boolean, default: true },
+    emergencySharing: { type: Boolean,default: true}
   },
   createdAt: { type: Date, default: Date.now },
   expiresAt: { type: Date },       // end of trip

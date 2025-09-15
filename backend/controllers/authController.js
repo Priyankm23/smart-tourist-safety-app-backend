@@ -11,6 +11,7 @@ const { JWT_SECRET , JWT_EXPIRES_IN} = require("../config/config")
 exports.registerTourist = async (req, res) => {
   try {
     const { name, govId, phone, email, dayWiseItinerary, tripMembers,  emergencyContact, password, language, tripEndDate } = req.body;
+    const { consent } = req.body;
 
     // Basic validation
     if (!name || !govId || !phone || !emergencyContact || !password || !email) {
@@ -66,7 +67,11 @@ exports.registerTourist = async (req, res) => {
       passwordHash,
       language: language || "en",
       safetyScore: 100,
-      consent: { tracking: false, dataRetention: true },
+      consent: {
+        tracking: consent?.tracking || false,
+        dataRetention: consent?.dataRetention || false,
+        emergencySharing: consent?.emergencySharing || false
+      },
       createdAt: new Date(),
       expiresAt: tripEndDate ? new Date(tripEndDate) : null,
     });
