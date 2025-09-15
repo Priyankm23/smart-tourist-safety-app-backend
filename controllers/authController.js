@@ -5,7 +5,7 @@ const { encrypt } = require("../utils/encrypt.js");
 const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const blockchain = require("../services/blockchainService.js");
-const { v4: uuidv4 } = require("uuid");
+
 const { JWT_SECRET , JWT_EXPIRES_IN} = require("../config/config")
 
 exports.registerTourist = async (req, res) => {
@@ -79,6 +79,7 @@ exports.registerTourist = async (req, res) => {
     await tourist.save();
 
     // Blockchain push
+    const { v4: uuidv4 } = require("uuid");
     const eventIdRaw = uuidv4() + "|" + touristId;
     const eventIdHash = sha256Hex(eventIdRaw);
     const eventIdBytes32 = hex64ToBytes32(eventIdHash);

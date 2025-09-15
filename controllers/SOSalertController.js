@@ -1,6 +1,5 @@
 const SOSAlert = require("../models/SOSalert.js");
 const { ethers } = require("ethers");
-const { v4: uuidv4 } = require("uuid");
 const { hex64ToBytes32 } = require('../utils/ethFormat.js');
 const { sha256Hex } = require("../utils/hash.js"); // your existing hash utility
 const { POLYGON_RPC, PRIVATE_KEY, SMART_CONTRACT_ADDRESS_sos } = require("../config/config.js");
@@ -160,7 +159,7 @@ exports.triggerSOS = async (req, res) => {
         
     await sosAlert.save();
 	console.log(sosAlert);
-
+	const { v4: uuidv4 } = require("uuid");
 	const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
     const eventIdHash = sha256Hex(eventIdRaw); // 64-char hex
     const eventIdBytes32 = hex64ToBytes32(eventIdHash);
