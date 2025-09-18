@@ -1,349 +1,145 @@
-# Smart Tourist Safety Monitoring - Backend API Documentation
+# Smart Tourist Safety — Backend
 
-This backend provides APIs for managing tourist registration, login, and retrieving tourist information. All sensitive data is encrypted or hashed for security, and blockchain integration is used for audit purposes.
+Lightweight backend for the Smart Tourist Safety system. Provides authentication, tourist and authority endpoints, geofencing, blockchain interaction stubs, realtime updates (Socket.IO), and MongoDB persistence.
+
+## Quick overview
+- Language: JavaScript (Node.js, CommonJS)
+- Frameworks & libs: Express, Mongoose, Passport (JWT), Socket.IO, ethers
+- Entry point: `app.js`
+- Config: `config/config.js` (reads from `.env`)
+
+## Requirements
+- Node.js (v16+ recommended)
+- npm
+- A running MongoDB database (connection string provided via `.env`)
+
+## Install
+
+Open a terminal in the project root (PowerShell on Windows) and run:
+
+```powershell
+npm install
+```
+
+## Environment (.env)
+Create a `.env` file at the project root. The app expects the following variables (sourced from `config/config.js`):
+
+```
+PORT=3000
+DB_URL=mongodb://localhost:27017/tourist-safety
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=7d
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+SERVER_URL=http://localhost:3000
+CLOUDINARY_NAME=your_cloud_name
+CLOUDINARY_KEY=your_cloudinary_key
+CLOUDINARY_SECRET=your_cloudinary_secret
+```
+
+Note: Keep secrets out of version control.
+
+## Scripts
+Available npm scripts (from `package.json`):
+
+- `npm run dev` — start in development using `nodemon app.js`
+- `npm start` — start with `node app.js`
+
+## Run
+Start the app in development:
+
+```powershell
+npm run dev
+```
+
+Or start in production mode:
+
+```powershell
+npm start
+```
+
+The server logs the startup message and attempts to connect to MongoDB (see `config/dbConnection.js`).
+
+## Docker
+You can build and run the backend as a Docker container or use `docker-compose` to run the backend together with MongoDB.
+
+1) Build the image locally (run from the `backend` folder):
+
+```powershell
+docker build -t tourist-backend:latest .
+```
+
+2) Run with a mounted `.env` (recommended for local dev):
+
+```powershell
+docker run --rm -p 3000:3000 `
+	-v ${PWD}\.env:/env/.env:ro `
+	-e APP_ENV_PATH=/env/.env `
+	--name tourist-backend `
+	tourist-backend:latest
+```
+
+3) Run with `docker-compose` (starts app + MongoDB):
+
+```powershell
+docker-compose up --build
+```
+
+Notes:
+- The image's entrypoint supports providing an env file at `/run/secrets/app_env` (useful with Docker secrets) or `/env/.env` (bind-mount). The entrypoint copies that file to the app root as `.env` before starting.
+- The compose file sets `DB_URL=mongodb://mongo:27017/tourist-safety` so the backend can connect to the `mongo` service.
+
+## Pulling from Docker Hub
+If you pushed an image to Docker Hub , you can pull and run it directly:
+
+```powershell
+docker pull redrepter/tourist-backend:latest
+docker run --rm -p 3000:3000 `
+	-e PORT=3000 `
+	-e DB_URL="mongodb://host:27017/tourist-safety" `
+	--name tourist-backend `
+	redrepter/tourist-backend:latest
+```
+
+Or with a mounted `.env` as above (set `APP_ENV_PATH=/env/.env`).
+
+## API (high level)
+The app mounts these routers in `app.js`:
+
+- `/api/auth` — authentication endpoints (login, signup, token refresh, social auth)
+- `/api/tourist` — tourist related actions
+- `/api/authority` — authority user management and endpoints
+- `/api/blockchain` — blockchain-related actions (uses `ethers`)
+- `/api/geofence` — geofence creation/validation
+
+Each route group is implemented in `routes/` and handled by controllers in `controllers/`.
+
+Authentication: JWT-based (see `jsonwebtoken`, `passport-jwt`). Protect routes using the supplied middleware in `middlewares/`.
+
+Realtime: Socket.IO is initialized by `services/realtimeService.js` and wired to the HTTP server in `app.js`. Use this for live alerts and location updates.
+
+Logging: HTTP request logging uses `morgan`; application logging uses `winston` (see `logs/` and `fallback.log`).
+
+## Database
+MongoDB via Mongoose. Connection logic is in `config/dbConnection.js`. Provide a valid `DB_URL` in `.env`.
+
+## Development notes
+- Code is CommonJS. Keep that style when adding files.
+- Add new dependencies with `npm i <pkg> --save` and dev tools with `npm i <pkg> -D`.
+- There are no unit tests in this repo by default — consider adding tests for controllers and services.
+
+## Useful files
+- `app.js` — server bootstrap and route wiring
+- `package.json` — scripts and dependencies
+- `config/config.js` — exported config (reads from `.env`)
+- `routes/` — route declarations
+- `controllers/` — request handlers
+- `services/` — background and helper services (realtime, blockchain, fallback)
+- `middlewares/` — authentication & error handling
+
+## Troubleshooting
+- If server won't start, check the `PORT` and `DB_URL` values in `.env`.
+- For MongoDB connection issues, verify the DB is reachable and credentials are correct.
+- Check `logs/fallback.log` for emergency logs written by the fallback service.
 
 ---
-
-## 1. Register Tourist
-
-**Endpoint:**
-
-```
-POST /api/auth/register
-```
-
-**Request Body:**
-
-```json
-{
-  "name": "John Doe",
-  "govId": "A123456789",
-  "phone": "9876543210",
-  "email": "john@example.com",
-  "password": "StrongPass123",
-  "itinerary": ["Hotel ABC", "City Tour", "Museum Visit"],
-  "emergencyContact": { "name": "Jane Doe", "phone": "9876543211" },
-  "language": "en",
-  "tripEndDate": "2025-10-01"
-}
-```
-
-**Response (201 Created):**
-
-```json
-{
-  "touristId": "T1694461234001",
-  "message": "Registered. Digital ID created.",
-  "audit": {
-    "regHash": "<payload-hash>",
-    "regTxHash": "<blockchain-tx-hash>",
-    "eventId": "<event-id-hash>"
-  }
-}
-```
-
----
-
-## 2. Login Tourist
-
-**Endpoint:**
-
-```
-POST /api/auth/login
-```
-
-**Request Body:**
-
-```json
-{
-  "email": "john@example.com",
-  "password": "StrongPass123"
-}
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "touristId": "T1694461234001",
-  "message": "Login successful",
-  "token": "<jwt-token>"
-}
-```
-
----
-
-## 3. Get Tourist Information
-
-**Endpoint:**
-
-```
-GET /api/tourist/:touristId
-```
-
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "touristId": "T1694461234001",
-  "name": "John Doe",
-  "phone": "9876543210",
-  "email": "john@example.com",
-  "itinerary": ["Hotel ABC", "City Tour", "Museum Visit"],
-  "emergencyContact": { "name": "Jane Doe", "phone": "9876543211" },
-  "language": "en",
-  "safetyScore": 100,
-  "consent": { "tracking": false, "dataRetention": true },
-  "createdAt": "2025-09-11T12:00:00.000Z",
-  "expiresAt": "2025-10-01T00:00:00.000Z",
-  "audit": {
-    "regHash": "<payload-hash>",
-    "regTxHash": "<blockchain-tx-hash>"
-  }
-}
-```
-
----
-
-## 4. Trigger SOS Alert
-
-**Endpoint:**
-
-```
-POST /api/sos/trigger
-```
-
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-```
-
-**Request Body:**
-
-```json
-{
-  "location": {
-    "coordinates": [80.1833, 16.3067],
-    "locationName": "Andhra Pradesh Coast"
-  },
-  "safetyScore": 85,
-  "sosReason": {
-    "reason": "Cyclone warning",
-    "weatherInfo": "Heavy rain expected",
-    "extra": "Move to safer zone immediately"
-  }
-}
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "success": true,
-  "message": "SOS alert triggered successfully",
-  "sosAlert": {
-    "id": "68c305fa481b6fc794e62b70",
-    "status": "new",
-    "location": {
-      "coordinates": [80.1833, 16.3067],
-      "locationName": "Andhra Pradesh Coast"
-    },
-    "timestamp": "2025-09-11T17:25:14.757Z",
-    "blockchainTxHash": "0x123abc456..."
-  }
-}
-```
-
----
-
-## 5. Get New SOS Alerts
-
-**Endpoint:**
-
-```
-GET /api/authority/alerts
-```
-
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-```
-
-**Response (200 OK):**
-
-```json
-[
-  {
-    "id": "68c305fa481b6fc794e62b70",
-    "touristId": "68c2c68bd03e438eca88fa4f",
-    "status": "new",
-    "location": {
-      "coordinates": [80.1833, 16.3067],
-      "locationName": "Andhra Pradesh Coast"
-    },
-    "safetyScore": 85,
-    "sosReason": {
-      "reason": "Cyclone warning",
-      "weatherInfo": "Heavy rain expected",
-      "extra": "Move to safer zone immediately"
-    },
-    "emergencyContact": {
-      "name": "Jane Doe",
-      "phone": "9876543211"
-    },
-    "timestamp": "2025-09-11T17:25:14.757Z",
-    "isLoggedOnChain": true,
-    "blockchainTxHash": "0x123abc456..."
-  }
-]
-```
-
----
-
-## 6. Danger Zones (Geo-Fencing)
-
-### a) Create Danger Zone
-
-**Endpoint:**
-
-```
-POST /api/geofence/zone
-```
-
-**Request Body:**
-
-```json
-{
-  "id": "disaster-0",
-  "name": "Andhra Pradesh Coast",
-  "type": "circle",
-  "coords": [16.3067, 80.1833],
-  "radiusKm": 5,
-  "category": "Natural Disaster Risk Area",
-  "state": "Andhra Pradesh",
-  "riskLevel": "Very High",
-  "source": "India Meteorological Department",
-  "raw": {
-    "Name": "Andhra Pradesh Coast",
-    "Category": "Natural Disaster Risk Area",
-    "Sub_Category": "Cyclone Zone",
-    "State": "Andhra Pradesh",
-    "Latitude": "16.3067",
-    "Longitude": "80.1833",
-    "Area_km2": "",
-    "Year_Established": "",
-    "Source": "India Meteorological Department",
-    "Additional_Info": "Risk Level: Very High"
-  }
-}
-```
-
-**Response (201 Created):**
-
-```json
-{
-  "success": true,
-  "message": "Danger zone created successfully",
-  "zone": {
-    "id": "disaster-0",
-    "name": "Andhra Pradesh Coast",
-    "type": "circle",
-    "coords": [16.3067, 80.1833],
-    "radiusKm": 5,
-    "category": "Natural Disaster Risk Area",
-    "state": "Andhra Pradesh",
-    "riskLevel": "Very High",
-    "source": "India Meteorological Department"
-  }
-}
-```
-
-### b) Get All Danger Zones
-
-**Endpoint:**
-
-```
-GET /api/geofence/
-```
-
-**Response (200 OK):**
-
-```json
-[
-  {
-    "id": "disaster-0",
-    "name": "Andhra Pradesh Coast",
-    "type": "circle",
-    "coords": [16.3067, 80.1833],
-    "radiusKm": 5,
-    "category": "Natural Disaster Risk Area",
-    "state": "Andhra Pradesh",
-    "riskLevel": "Very High",
-    "source": "India Meteorological Department"
-  }
-]
-```
-
-### c) Get Danger Zone By ID
-
-**Endpoint:**
-
-```
-GET /api/geofence/:id
-```
-
-**Response (200 OK):**
-
-```json
-{
-  "id": "disaster-0",
-  "name": "Andhra Pradesh Coast",
-  "type": "circle",
-  "coords": [16.3067, 80.1833],
-  "radiusKm": 5,
-  "category": "Natural Disaster Risk Area",
-  "state": "Andhra Pradesh",
-  "riskLevel": "Very High",
-  "source": "India Meteorological Department",
-  "raw": {
-    "Name": "Andhra Pradesh Coast",
-    "Category": "Natural Disaster Risk Area",
-    "Sub_Category": "Cyclone Zone",
-    "State": "Andhra Pradesh",
-    "Latitude": "16.3067",
-    "Longitude": "80.1833",
-    "Area_km2": "",
-    "Year_Established": "",
-    "Source": "India Meteorological Department",
-    "Additional_Info": "Risk Level: Very High"
-  }
-}
-
-```
-
-
-## Notes
-
-* All sensitive information (name, phone, email, itinerary, emergency contacts) is **AES encrypted** in the database.
-* `govId` is stored as a **SHA256 hash** for privacy.
-* Blockchain integration ensures auditability of registration records.
-* JWT token must be included in headers for all protected routes.
-
----
-
-## Technologies Used
-
-* Node.js + Express
-* MongoDB + Mongoose
-* AES Encryption & SHA256 hashing
-* Blockchain (Ethereum / Remix smart contract)
-* JWT Authentication
