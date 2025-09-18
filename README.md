@@ -26,15 +26,14 @@ Create a `.env` file at the project root. The app expects the following variable
 
 ```
 PORT=3000
-DB_URL=mongodb://localhost:27017/tourist-safety
+DB_URL=your_mongo_connection_URL
 JWT_SECRET=your_jwt_secret
 JWT_EXPIRES_IN=7d
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-SERVER_URL=http://localhost:3000
-CLOUDINARY_NAME=your_cloud_name
-CLOUDINARY_KEY=your_cloudinary_key
-CLOUDINARY_SECRET=your_cloudinary_secret
+PRIVATE_KEY=your_wallet_key
+SMART_CONTRACT_ADDRESS_reg=your_registration_contract_address
+SMART_CONTRACT_ADDRESS_sos=your_sos_contract_address
+POLYGON_RPC=your_rpc_provider
+
 ```
 
 Note: Keep secrets out of version control.
