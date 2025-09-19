@@ -66,7 +66,7 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Login to Azure Container Registry (from secrets)
+    - name: Login to Azure Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ steps.acr-creds.outputs.registry }}
@@ -94,42 +94,38 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64
 
-    - name: Create/Update Azure Web App
+    - name: Create App Service Plan if needed
       env:
         SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
         PLAN_NAME: ${{ secrets.PLAN_NAME }}
       run: |
-        # Ensure Microsoft.Web resource provider is registered in the target subscription
-        echo "Registering Microsoft.Web provider (if not already) for subscription $SUBSCRIPTION_ID..."
-        az provider register --namespace Microsoft.Web --subscription $SUBSCRIPTION_ID || true
-
-        # Poll registration state for up to ~2 minutes
-        for i in 1 2 3 4 5 6; do
-          state=$(az provider show --namespace Microsoft.Web --subscription $SUBSCRIPTION_ID --query registrationState -o tsv || echo "")
-          echo "Microsoft.Web registration state: $state"
-          if [ "$state" = "Registered" ]; then
-            break
-          fi
-          if [ $i -eq 6 ]; then
-            echo "ERROR: Microsoft.Web provider did not reach 'Registered' state in time for subscription $SUBSCRIPTION_ID. Check subscription registration and permissions."
-            exit 1
-          fi
-          sleep 20
-        done
-
-        # Ensure the App Service plan exists before creating the Web App
         if ! az appservice plan show --name $PLAN_NAME --resource-group ${{ env.RESOURCE_GROUP }} --subscription $SUBSCRIPTION_ID &>/dev/null; then
           echo "Creating App Service Plan '$PLAN_NAME'..."
-          az appservice plan create --name $PLAN_NAME --resource-group ${{ env.RESOURCE_GROUP }} --sku B1 --is-linux --location ${{ env.LOCATION }} --subscription $SUBSCRIPTION_ID
-          echo "App Service Plan created"
+          az appservice plan create \
+            --name $PLAN_NAME \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --sku B1 \
+            --is-linux \
+            --location ${{ env.LOCATION }} \
+            --subscription $SUBSCRIPTION_ID
+          echo "App Service Plan created successfully"
         else
           echo "App Service Plan '$PLAN_NAME' already exists"
         fi
 
-        # Check if web app exists; create only if missing
+    - name: Create Web App if needed
+      env:
+        SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+        PLAN_NAME: ${{ secrets.PLAN_NAME }}
+      run: |
         if ! az webapp show --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --subscription $SUBSCRIPTION_ID &>/dev/null; then
           echo "Creating new Azure Web App..."
-          az webapp create --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --plan $PLAN_NAME --subscription $SUBSCRIPTION_ID
+          az webapp create \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --plan $PLAN_NAME \
+            --subscription $SUBSCRIPTION_ID \
+            --deployment-container-image-name nginx:latest
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' created successfully"
         else
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' already exists"
@@ -200,6 +196,10 @@ jobs:
         echo ""
         echo "Your Backend API is now live at:"
         echo "https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo ""
+        echo "Quick Health Check Commands:"
+        echo "curl https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "curl https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/health"
 
   notify-failure:
     needs: build-and-deploy
@@ -213,8 +213,4 @@ jobs:
         echo "DEPLOYMENT FAILED!"
         echo "=================================="
         echo ""
-        echo "Please check the logs above for error details."
-        echo "Common issues to check:"
-        echo "   • Docker build errors"
-        echo "   • Azure credentials"
-        echo "   • Resource group permissions"
+        echo "Please check the logs above for error details."
