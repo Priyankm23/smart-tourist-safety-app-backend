@@ -1,4 +1,4 @@
-# Smart Tourist Safety — Backend
+# Smart Tourist Safety 
 
 Lightweight backend for the Smart Tourist Safety system. Provides authentication, tourist and authority endpoints, geofencing, blockchain interaction stubs, realtime updates (Socket.IO), and MongoDB persistence.
 
