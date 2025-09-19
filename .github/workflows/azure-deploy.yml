@@ -29,6 +29,13 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    - name: Set Azure subscription
+      env:
+        SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+      run: |
+        echo "Setting Azure subscription to $SUBSCRIPTION_ID"
+        az account set --subscription $SUBSCRIPTION_ID
+
     - name: Ensure Resource Group exists
       run: |
         az group create --name ${{ env.RESOURCE_GROUP }} --location ${{ env.LOCATION }} --output none
@@ -88,28 +95,41 @@ jobs:
         platforms: linux/amd64
 
     - name: Create/Update Azure Web App
+      env:
+        SUBSCRIPTION_ID: ${{ secrets.SUBSCRIPTION_ID }}
+        PLAN_NAME: ${{ secrets.PLAN_NAME }}
       run: |
+        # Ensure Microsoft.Web resource provider is registered in the target subscription
+        echo "Registering Microsoft.Web provider (if not already) for subscription $SUBSCRIPTION_ID..."
+        az provider register --namespace Microsoft.Web --subscription $SUBSCRIPTION_ID || true
+
+        # Poll registration state for up to ~2 minutes
+        for i in 1 2 3 4 5 6; do
+          state=$(az provider show --namespace Microsoft.Web --subscription $SUBSCRIPTION_ID --query registrationState -o tsv || echo "")
+          echo "Microsoft.Web registration state: $state"
+          if [ "$state" = "Registered" ]; then
+            break
+          fi
+          if [ $i -eq 6 ]; then
+            echo "ERROR: Microsoft.Web provider did not reach 'Registered' state in time for subscription $SUBSCRIPTION_ID. Check subscription registration and permissions."
+            exit 1
+          fi
+          sleep 20
+        done
+
         # Ensure the App Service plan exists before creating the Web App
-        if ! az appservice plan show --name myAppServicePlan --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
-          echo "Creating App Service Plan 'myAppServicePlan'..."
-          az appservice plan create \
-            --name myAppServicePlan \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --sku B1 \
-            --is-linux \
-            --location ${{ env.LOCATION }}
+        if ! az appservice plan show --name $PLAN_NAME --resource-group ${{ env.RESOURCE_GROUP }} --subscription $SUBSCRIPTION_ID &>/dev/null; then
+          echo "Creating App Service Plan '$PLAN_NAME'..."
+          az appservice plan create --name $PLAN_NAME --resource-group ${{ env.RESOURCE_GROUP }} --sku B1 --is-linux --location ${{ env.LOCATION }} --subscription $SUBSCRIPTION_ID
           echo "App Service Plan created"
         else
-          echo "App Service Plan 'myAppServicePlan' already exists"
+          echo "App Service Plan '$PLAN_NAME' already exists"
         fi
 
         # Check if web app exists; create only if missing
-        if ! az webapp show --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
+        if ! az webapp show --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --subscription $SUBSCRIPTION_ID &>/dev/null; then
           echo "Creating new Azure Web App..."
-          az webapp create \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --plan myAppServicePlan
+          az webapp create --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --plan $PLAN_NAME --subscription $SUBSCRIPTION_ID
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' created successfully"
         else
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' already exists"
@@ -198,4 +218,3 @@ jobs:
         echo "   • Docker build errors"
         echo "   • Azure credentials"
         echo "   • Resource group permissions"
-
