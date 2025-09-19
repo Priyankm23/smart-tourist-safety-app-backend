@@ -49,20 +49,17 @@ jobs:
           echo "ACR '${{ env.REGISTRY_NAME }}' already exists"
         fi
 
-    - name: Get ACR credentials
+    - name: Use ACR credentials from secrets
       id: acr-creds
       run: |
-        ACR_USERNAME=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --query username -o tsv)
-        ACR_PASSWORD=$(az acr credential show --name ${{ env.REGISTRY_NAME }} --query passwords[0].value -o tsv)
-        echo "::add-mask::$ACR_PASSWORD"
-        echo "username=$ACR_USERNAME" >> $GITHUB_OUTPUT
-        echo "password=$ACR_PASSWORD" >> $GITHUB_OUTPUT
+        echo "username=${{ secrets.ACR_USERNAME }}" >> $GITHUB_OUTPUT
+        echo "password=${{ secrets.ACR_PASSWORD }}" >> $GITHUB_OUTPUT
         echo "registry=${{ env.REGISTRY_NAME }}.azurecr.io" >> $GITHUB_OUTPUT
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Login to Azure Container Registry
+    - name: Login to Azure Container Registry (from secrets)
       uses: docker/login-action@v3
       with:
         registry: ${{ steps.acr-creds.outputs.registry }}
@@ -207,4 +204,3 @@ jobs:
         echo "   • Azure credentials"
         echo "   • Resource group permissions"
         echo "   • App Service plan limits"
-     

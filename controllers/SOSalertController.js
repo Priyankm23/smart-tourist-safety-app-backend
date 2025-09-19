@@ -128,79 +128,69 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
 exports.triggerSOS = async (req, res) => {
   try {
     const { location, safetyScore, locationName, sosReason } = req.body;
-	const touristId = req.user.touristId;
+    const touristId = req.user.touristId;
 
-    // 1. Get tourist details
+    // 1️⃣ Get tourist details
     const tourist = await Tourist.findOne({ touristId });
-    if (!tourist) {
-      return res.status(404).json({ error: "Tourist not found" });
+    if (!tourist) return res.status(404).json({ error: "Tourist not found" });
+
+    // 2️⃣ Decrypt emergency contact
+    let emergencyContact = null;
+    if (tourist.emergencyContactEncrypted) {
+      emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
     }
 
-    // 2. Decrypt emergency contact
-    let emergencyContact = null;
-    
-    if (tourist.emergencyContactEncrypted) {
-      const decrypted = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
-      console.log("🔍 Decrypted emergency contact:", decrypted);
-    
-      emergencyContact = decrypted;
-    }
-    console.log(emergencyContact);
-        
+    // 3️⃣ Save SOS in MongoDB immediately
     const sosAlert = new SOSAlert({
       touristId: tourist._id,
       location,
       safetyScore,
       locationName,
       sosReason,
-      emergencyContact,   // now the right shape
+      emergencyContact,
       status: "new",
     });
-        
-    await sosAlert.save();
-	console.log(sosAlert);
-	const { v4: uuidv4 } = require("uuid");
-	const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
-    const eventIdHash = sha256Hex(eventIdRaw); // 64-char hex
-    const eventIdBytes32 = hex64ToBytes32(eventIdHash);
-
-    // 2️⃣ Compute payload hash for blockchain (using bytes32)
-    const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
-    const payloadHash = ethers.id(payloadString); // keccak256
-
-    const alertId = eventIdBytes32;
-
-    console.log("📌 Logging SOS alert on-chain...");
-    console.log("Alert ID:", alertId);
-    console.log("Payload Hash:", payloadHash);
-
-    // 3️⃣ Send transaction to blockchain
-    const tx = await contract.logAlert(alertId, payloadHash);
-    console.log("⏳ Transaction sent. Waiting for confirmation...");
-
-    const receipt = await tx.wait();
-    console.log("✅ Alert logged on-chain!", receipt.hash);
-
-    // 4️⃣ Update MongoDB with blockchain info
-    sosAlert.blockchainTxHash = receipt.hash;
-    sosAlert.isLoggedOnChain = true;
-    sosAlert.alertIdOnChain = alertId;
-    sosAlert.payloadHashOnChain = payloadHash;
-
     await sosAlert.save();
 
-    // 5️⃣ Respond to client
-    return res.json({
+    // 4️⃣ Respond to authority / client immediately
+    res.json({
       success: true,
-      message: "SOS alert triggered successfully",
+      message: "SOS alert received. Authorities have been notified.",
       sosAlert: {
         id: sosAlert._id,
         status: sosAlert.status,
         location: sosAlert.location,
         timestamp: sosAlert.timestamp,
-        blockchainTxHash: sosAlert.blockchainTxHash
-      }
+      },
     });
+
+    // 5️⃣ AFTER response: log alert on blockchain asynchronously
+    (async () => {
+      try {
+        const { v4: uuidv4 } = require("uuid");
+        const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
+        const eventIdHash = sha256Hex(eventIdRaw);
+        const alertId = hex64ToBytes32(eventIdHash);
+
+        const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
+        const payloadHash = ethers.id(payloadString);
+
+        console.log("📌 Logging SOS alert on-chain...");
+        const tx = await contract.logAlert(alertId, payloadHash);
+        const receipt = await tx.wait();
+
+        // Update MongoDB with blockchain info
+        sosAlert.blockchainTxHash = receipt.hash;
+        sosAlert.isLoggedOnChain = true;
+        sosAlert.alertIdOnChain = alertId;
+        sosAlert.payloadHashOnChain = payloadHash;
+        await sosAlert.save();
+
+        console.log("✅ SOS logged on-chain:", receipt.hash);
+      } catch (err) {
+        console.error("❌ Blockchain logging error:", err);
+      }
+    })();
 
   } catch (err) {
     console.error("❌ triggerSOS error:", err);
