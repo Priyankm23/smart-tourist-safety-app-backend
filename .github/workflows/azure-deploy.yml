@@ -89,32 +89,27 @@ jobs:
 
     - name: Create/Update Azure Web App
       run: |
-        # Check if web app exists
+        # Ensure the App Service plan exists before creating the Web App
+        if ! az appservice plan show --name myAppServicePlan --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
+          echo "Creating App Service Plan 'myAppServicePlan'..."
+          az appservice plan create \
+            --name myAppServicePlan \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --sku B1 \
+            --is-linux \
+            --location ${{ env.LOCATION }}
+          echo "App Service Plan created"
+        else
+          echo "App Service Plan 'myAppServicePlan' already exists"
+        fi
+
+        # Check if web app exists; create only if missing
         if ! az webapp show --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
           echo "Creating new Azure Web App..."
           az webapp create \
             --name ${{ env.AZURE_WEBAPP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --plan myAppServicePlan \
-            --deployment-container-image-name ${{ steps.acr-creds.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
-          
-          # Create app service plan if it doesn't exist
-          if ! az appservice plan show --name myAppServicePlan --resource-group ${{ env.RESOURCE_GROUP }} &>/dev/null; then
-            az appservice plan create \
-              --name myAppServicePlan \
-              --resource-group ${{ env.RESOURCE_GROUP }} \
-              --sku B1 \
-              --is-linux \
-              --location ${{ env.LOCATION }}
-          fi
-          
-          # Create the web app with container
-          az webapp create \
-            --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --plan myAppServicePlan \
-            --deployment-container-image-name ${{ steps.acr-creds.outputs.registry }}/${{ env.IMAGE_NAME }}:latest
-          
+            --plan myAppServicePlan
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' created successfully"
         else
           echo "Web App '${{ env.AZURE_WEBAPP_NAME }}' already exists"
@@ -203,4 +198,4 @@ jobs:
         echo "   • Docker build errors"
         echo "   • Azure credentials"
         echo "   • Resource group permissions"
-        echo "   • App Service plan limits"
+
