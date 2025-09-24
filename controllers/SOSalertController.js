@@ -152,7 +152,7 @@ exports.triggerSOS = async (req, res) => {
     });
     await sosAlert.save();
 
-    // 4️⃣ Respond to authority / client immediately
+    // 4️⃣ Respond to client immediately
     res.json({
       success: true,
       message: "SOS alert received. Authorities have been notified.",
@@ -176,7 +176,16 @@ exports.triggerSOS = async (req, res) => {
         const payloadHash = ethers.id(payloadString);
 
         console.log("📌 Logging SOS alert on-chain...");
-        const tx = await contract.logAlert(alertId, payloadHash);
+
+        // ✅ OPTION B: Manual nonce handling
+        const provider = contract.runner.provider;
+        const signer = contract.runner; // assuming contract is connected with signer
+
+        // Get latest nonce from chain
+        let nonce = await provider.getTransactionCount(signer.address, "latest");
+
+        // Send tx with explicit nonce
+        const tx = await contract.logAlert(alertId, payloadHash, { nonce });
         const receipt = await tx.wait();
 
         // Update MongoDB with blockchain info
@@ -197,3 +206,4 @@ exports.triggerSOS = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
