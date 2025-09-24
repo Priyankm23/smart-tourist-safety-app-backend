@@ -125,6 +125,22 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
  *   sosReason: { reason, weatherInfo, extra }
  * }
  */
+let nextNoncePromise = null;
+
+async function getSafeNonce(signer) {
+  if (!nextNoncePromise) {
+    const provider = signer.provider;
+    const currentNonce = await provider.getTransactionCount(signer.address, "pending");
+    let nonce = currentNonce;
+    nextNoncePromise = Promise.resolve(nonce);
+  }
+
+  const currentNonce = await nextNoncePromise;
+  nextNoncePromise = Promise.resolve(currentNonce + 1);
+  return currentNonce;
+}
+
+// === main triggerSOS function ===
 exports.triggerSOS = async (req, res) => {
   try {
     const { location, safetyScore, locationName, sosReason } = req.body;
@@ -177,14 +193,9 @@ exports.triggerSOS = async (req, res) => {
 
         console.log("📌 Logging SOS alert on-chain...");
 
-        // ✅ OPTION B: Manual nonce handling
-        const provider = contract.runner.provider;
-        const signer = contract.runner; // assuming contract is connected with signer
+        const signer = contract.runner; // signer attached to contract
+        const nonce = await getSafeNonce(signer);
 
-        // Get latest nonce from chain
-        let nonce = await provider.getTransactionCount(signer.address, "latest");
-
-        // Send tx with explicit nonce
         const tx = await contract.logAlert(alertId, payloadHash, { nonce });
         const receipt = await tx.wait();
 
@@ -206,4 +217,3 @@ exports.triggerSOS = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
