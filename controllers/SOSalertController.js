@@ -184,19 +184,27 @@ exports.triggerSOS = async (req, res) => {
         if (!global.sosQueue) global.sosQueue = Promise.resolve();
 
         global.sosQueue = global.sosQueue.then(async () => {
-          const tx = await contract.logAlert(alertId, payloadHash);
-          const receipt = await tx.wait();
-
-          // Update MongoDB
-          sosAlert.blockchainTxHash = receipt.hash;
-          sosAlert.isLoggedOnChain = true;
-          sosAlert.alertIdOnChain = alertId;
-          sosAlert.payloadHashOnChain = payloadHash;
-          await sosAlert.save();
-
-          console.log("✅ SOS logged on-chain:", receipt.hash);
-        }).catch(err => {
-          console.error("❌ Blockchain logging error:", err);
+          try {
+            const tx = await contract.logAlert(alertId, payloadHash);
+            const receipt = await tx.wait();
+        
+            // ⚡ Create a fresh reference to SOSAlert from DB to ensure correct scope
+            const alertToUpdate = await SOSAlert.findById(sosAlert._id);
+            if (!alertToUpdate) {
+              console.error("❌ SOSAlert not found in DB for updating blockchain info");
+              return;
+            }
+        
+            alertToUpdate.blockchainTxHash = receipt.hash;
+            alertToUpdate.isLoggedOnChain = true;
+            alertToUpdate.alertIdOnChain = alertId;
+            alertToUpdate.payloadHashOnChain = payloadHash;
+            await alertToUpdate.save();
+        
+            console.log("✅ SOS logged on-chain:", receipt.hash);
+          } catch (err) {
+            console.error("❌ Blockchain logging error:", err);
+          }
         });
 
         await global.sosQueue; // ensure sequence
