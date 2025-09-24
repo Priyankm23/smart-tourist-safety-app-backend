@@ -164,50 +164,52 @@ exports.triggerSOS = async (req, res) => {
       },
     });
 
-    // 5️⃣ AFTER response: Sequentially log alerts on blockchain
+    // 5️⃣ AFTER response: Sequential blockchain logging queue
     (async () => {
       try {
         const { v4: uuidv4 } = require("uuid");
-        const signer = contract.runner;
 
-        // Create payload for this alert
-        const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
-        const eventIdHash = sha256Hex(eventIdRaw);
-        const alertId = hex64ToBytes32(eventIdHash);
+        const processSOSLogging = async (alert) => {
+          const eventIdRaw = uuidv4() + "|" + alert._id.toString();
+          const eventIdHash = sha256Hex(eventIdRaw);
+          const alertId = hex64ToBytes32(eventIdHash);
 
-        const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
-        const payloadHash = ethers.id(payloadString);
+          const payloadString = `${alert._id}|${touristId}|${alert.location.coordinates.join(",")}|${alert.sosReason.reason}|${alert.timestamp.toISOString()}`;
+          const payloadHash = ethers.id(payloadString);
 
-        console.log("📌 Logging SOS alert on-chain...");
+          console.log("📌 Logging SOS alert on-chain for:", alert._id);
 
-        // Wait for the previous transaction to finish before sending this one
-        if (!global.sosQueue) global.sosQueue = Promise.resolve();
-
-        global.sosQueue = global.sosQueue.then(async () => {
           try {
             const tx = await contract.logAlert(alertId, payloadHash);
             const receipt = await tx.wait();
-        
-            // ⚡ Create a fresh reference to SOSAlert from DB to ensure correct scope
-            const alertToUpdate = await SOSAlert.findById(sosAlert._id);
+
+            const alertToUpdate = await SOSAlert.findById(alert._id);
             if (!alertToUpdate) {
-              console.error("❌ SOSAlert not found in DB for updating blockchain info");
+              console.error("❌ SOSAlert not found in DB for blockchain update");
               return;
             }
-        
+
             alertToUpdate.blockchainTxHash = receipt.hash;
             alertToUpdate.isLoggedOnChain = true;
             alertToUpdate.alertIdOnChain = alertId;
             alertToUpdate.payloadHashOnChain = payloadHash;
             await alertToUpdate.save();
-        
-            console.log("✅ SOS logged on-chain:", receipt.hash);
-          } catch (err) {
-            console.error("❌ Blockchain logging error:", err);
-          }
-        });
 
-        await global.sosQueue; // ensure sequence
+            console.log("✅ SOS logged on-chain:", receipt.hash);
+          } catch (blockchainErr) {
+            console.error("❌ Blockchain logging error:", blockchainErr);
+          }
+        };
+
+        // Sequential processing queue
+        if (!global.sosQueue) {
+          global.sosQueue = Promise.resolve();
+        }
+
+        // Add SOS to the queue
+        global.sosQueue = global.sosQueue.then(() => processSOSLogging(sosAlert));
+        await global.sosQueue; // Ensure the order
+
       } catch (err) {
         console.error("❌ triggerSOS blockchain async error:", err);
       }
@@ -218,3 +220,4 @@ exports.triggerSOS = async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 };
+
