@@ -125,22 +125,6 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
  *   sosReason: { reason, weatherInfo, extra }
  * }
  */
-let nextNoncePromise = null;
-
-async function getSafeNonce(signer) {
-  if (!nextNoncePromise) {
-    const provider = signer.provider;
-    const currentNonce = await provider.getTransactionCount(signer.address, "pending");
-    let nonce = currentNonce;
-    nextNoncePromise = Promise.resolve(nonce);
-  }
-
-  const currentNonce = await nextNoncePromise;
-  nextNoncePromise = Promise.resolve(currentNonce + 1);
-  return currentNonce;
-}
-
-// === main triggerSOS function ===
 exports.triggerSOS = async (req, res) => {
   try {
     const { location, safetyScore, locationName, sosReason } = req.body;
@@ -180,10 +164,13 @@ exports.triggerSOS = async (req, res) => {
       },
     });
 
-    // 5️⃣ AFTER response: log alert on blockchain asynchronously
+    // 5️⃣ AFTER response: Sequentially log alerts on blockchain
     (async () => {
       try {
         const { v4: uuidv4 } = require("uuid");
+        const signer = contract.runner;
+
+        // Create payload for this alert
         const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
         const eventIdHash = sha256Hex(eventIdRaw);
         const alertId = hex64ToBytes32(eventIdHash);
@@ -193,22 +180,28 @@ exports.triggerSOS = async (req, res) => {
 
         console.log("📌 Logging SOS alert on-chain...");
 
-        const signer = contract.runner; // signer attached to contract
-        const nonce = await getSafeNonce(signer);
+        // Wait for the previous transaction to finish before sending this one
+        if (!global.sosQueue) global.sosQueue = Promise.resolve();
 
-        const tx = await contract.logAlert(alertId, payloadHash, { nonce });
-        const receipt = await tx.wait();
+        global.sosQueue = global.sosQueue.then(async () => {
+          const tx = await contract.logAlert(alertId, payloadHash);
+          const receipt = await tx.wait();
 
-        // Update MongoDB with blockchain info
-        sosAlert.blockchainTxHash = receipt.hash;
-        sosAlert.isLoggedOnChain = true;
-        sosAlert.alertIdOnChain = alertId;
-        sosAlert.payloadHashOnChain = payloadHash;
-        await sosAlert.save();
+          // Update MongoDB
+          sosAlert.blockchainTxHash = receipt.hash;
+          sosAlert.isLoggedOnChain = true;
+          sosAlert.alertIdOnChain = alertId;
+          sosAlert.payloadHashOnChain = payloadHash;
+          await sosAlert.save();
 
-        console.log("✅ SOS logged on-chain:", receipt.hash);
+          console.log("✅ SOS logged on-chain:", receipt.hash);
+        }).catch(err => {
+          console.error("❌ Blockchain logging error:", err);
+        });
+
+        await global.sosQueue; // ensure sequence
       } catch (err) {
-        console.error("❌ Blockchain logging error:", err);
+        console.error("❌ triggerSOS blockchain async error:", err);
       }
     })();
 
