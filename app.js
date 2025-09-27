@@ -9,7 +9,6 @@ const touristRoutes = require('./routes/touristRoutes');
 const authorityRoutes = require('./routes/authorityRoutes');
 const sosRoutes = require('./routes/sosRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
-const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
