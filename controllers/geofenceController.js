@@ -71,3 +71,18 @@ exports.getZonebyId = async ( req, res, next) =>{
     next(error);
   }
 }
+
+exports.getHighRiskZoneCount = async (req, res, next) => {
+  try {
+    const highRiskCount = await DangerZone.countDocuments({ riskLevel: "High" });
+
+    res.status(200).json({
+      success: true,
+      highRiskZones: highRiskCount,
+    });
+  } catch (error) {
+    console.error("Error counting high-risk zones:", error);
+    res.status(500).json({ error: "Internal server error" });
+    next(error);
+  }
+};

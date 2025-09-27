@@ -11,7 +11,6 @@ exports.getNewSosAlerts = async (req, res, next) => {
     // Fetch all SOS alerts with status 'new', sorted by latest timestamp first
     const alerts = await SOSAlert.find({ status: 'new' }).sort({ timestamp: -1 });
 
-    console.log("Alerts to send:", alerts)
     res.status(200).json({
       success: true,
       count: alerts.length,
