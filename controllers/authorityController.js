@@ -23,5 +23,18 @@ exports.getNewSosAlerts = async (req, res, next) => {
   }
 };
 
+exports.getSosCounts = async (req, res, next) => {
+  try {
+    const newCount = await SOSAlert.countDocuments({ status: "new" });
+
+    res.status(200).json({
+      success: true,
+      new: newCount,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 
