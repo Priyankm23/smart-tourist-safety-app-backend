@@ -9,7 +9,7 @@ const touristRoutes = require('./routes/touristRoutes');
 const authorityRoutes = require('./routes/authorityRoutes');
 const sosRoutes = require('./routes/sosRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
-const path = require("path"); 
+const cors = require("cors");
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +22,11 @@ app.use(morgan('dev'));
 app.use(express.json({
   strict: true, // ensures invalid JSON is rejected
   limit: '1mb'
+}));
+
+app.use(cors({
+  origin: 'http://localhost:5173', // replace with your frontend origin
+  credentials: true,
 }));
 
 
