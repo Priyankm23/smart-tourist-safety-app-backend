@@ -1,5 +1,6 @@
 const SOSAlert = require("../models/SOSalert.js");
 const { ethers } = require("ethers");
+const { updateRiskScores } = require('../services/riskEngineService'); // Import Risk Engine
 const { hex64ToBytes32 } = require('../utils/ethFormat.js');
 const { sha256Hex } = require("../utils/hash.js"); // your existing hash utility
 const { POLYGON_RPC, PRIVATE_KEY, SMART_CONTRACT_ADDRESS_sos } = require("../config/config.js");
@@ -152,7 +153,10 @@ exports.triggerSOS = async (req, res) => {
     });
     await sosAlert.save();
 
-    // 4️⃣ Respond to client immediately
+    // 4️⃣ Trigger Real-time Risk Update
+    updateRiskScores().catch(err => console.error("Risk update failed:", err));
+
+    // 5️⃣ Respond to client immediately
     res.json({
       success: true,
       message: "SOS alert received. Authorities have been notified.",
@@ -164,7 +168,7 @@ exports.triggerSOS = async (req, res) => {
       },
     });
 
-    // 5️⃣ AFTER response: Sequentially log alerts on blockchain
+    // 6️⃣ AFTER response: Sequentially log alerts on blockchain
     (async () => {
       try {
         const { v4: uuidv4 } = require("uuid");

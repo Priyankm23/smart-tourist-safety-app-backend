@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const Tourist = require("../models/Tourist.js");
 const bcrypt = require("bcryptjs");
 const { encrypt } = require("../utils/encrypt.js");
+const { decrypt } = require("../utils/encrypt.js");
 const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const blockchain = require("../services/blockchainService.js");
@@ -33,8 +34,18 @@ exports.registerTourist = async (req, res) => {
     const nameEnc = encrypt(name);
     const phoneEnc = encrypt(phone);
     const dayWiseItineraryEnc = dayWiseItinerary
-      ? encrypt(JSON.stringify(dayWiseItinerary))
+  ? encrypt(JSON.stringify(dayWiseItinerary))
       : null;
+    
+    // Check encryption and decryption right away
+    if (dayWiseItineraryEnc) {
+      console.log("Encrypted itinerary:", dayWiseItineraryEnc);
+    
+      const decryptedItinerary = JSON.parse(decrypt(dayWiseItineraryEnc));
+      console.log("Decrypted itinerary:", decryptedItinerary);
+    
+      console.log("Match check:", JSON.stringify(dayWiseItinerary) === JSON.stringify(decryptedItinerary));
+    }
     const tripMembersEnc = tripMembers
       ? encrypt(JSON.stringify(tripMembers))
       : null;

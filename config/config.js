@@ -16,5 +16,6 @@ module.exports={
     CLOUDINARY_NAME,
     CLOUDINARY_KEY,
     CLOUDINARY_SECRET,
-    ENCRYPTION_KEY
+    ENCRYPTION_KEY,
+    NEWS_API_KEY
 }=process.env

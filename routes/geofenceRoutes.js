@@ -1,5 +1,5 @@
 const express = require('express');
-const { receiveGeofenceTransitions ,createGeoFenceToDangerLocation, getallZones, getZonebyId,getHighRiskZoneCount} = require('../controllers/geofenceController');
+const { receiveGeofenceTransitions ,createGeoFenceToDangerLocation, getallZones, getZonebyId,getHighRiskZoneCount, getDynamicRiskZones, triggerRiskUpdate} = require('../controllers/geofenceController');
 const { verifyToken } = require('../middlewares/authMiddleware');
 const  DangerZone  = require('../models/Geofence');
 
@@ -13,6 +13,9 @@ router.post('/zone',verifyToken,createGeoFenceToDangerLocation);
 router.get('/',getallZones);
 
 router.get('/count',getHighRiskZoneCount);
+
+router.get('/dynamic', getDynamicRiskZones); 
+router.post('/risk/update', triggerRiskUpdate);
 
 router.get('/:id',verifyToken,getZonebyId);
 
