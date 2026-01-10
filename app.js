@@ -31,6 +31,17 @@ app.use(cors({
   credentials: true,
 }));
 
+app.get("/",(req,res)=>{
+  routes={
+    "authenticatioin":"/api/auth",
+    "tourist":"/api/tourist",
+    "heatmap":"/api/heatmap",
+    "authority":"/api/authority",
+    "geofence":"/api/geofence",
+    "sos":"/api/sos"
+  }
+  res.status(200).json({message:"tourist safety main aapka swagat hai !",routes:routes});
+})
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tourist', touristRoutes);
