@@ -6,10 +6,10 @@ const SOSAlert = require('../models/SOSalert');
 const GRID_SIZE_DEG = 0.0045; // Approx 500m (Reverted from 3km)
 const LAMBDA = 0.01; // Time decay factor (Reduced for 7-day persistence)
 
-// Weights (Tuned to reduce News bias)
-const W_NEWS = 0.25;  // Reduced from 0.4
-const W_SOS = 0.65;   // Increased to prioritize real-time user safety
-const W_HISTORY = 0.1;
+// Weights (Tuned to increase Incident impact)
+const W_INCIDENT = 0.40;
+const W_SOS = 0.50;
+const W_HISTORY = 0.10;
 
 /**
  * Convert lat/lng to a fixed grid ID and center point
@@ -90,8 +90,8 @@ async function processGrid(gridId) {
     let sosScore = Math.min(sosHighPriority / 3, 1.0);
 
 
-    // --- 2. News/Incident Component ---
-    // Search larger radius (3.5km) for news, decays over 7 days (Extended from 24h)
+    // --- 2. Incident Component (Crowdsourced Reports) ---
+    // Search larger radius (3.5km) for incidents, decays over 7 days
     const incidents = await Incident.find({
         location: {
             $geoWithin: {
@@ -101,13 +101,13 @@ async function processGrid(gridId) {
         timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     });
     
-    let newsScore = 0;
+    let incidentScore = 0;
     if (incidents.length > 0) {
         const totalImpact = incidents.reduce((acc, inc) => {
             const hoursAgo = (Date.now() - inc.timestamp) / (1000 * 60 * 60);
             return acc + (inc.severity * Math.exp(-LAMBDA * hoursAgo));
         }, 0);
-        newsScore = Math.min(totalImpact, 1.0);
+        incidentScore = Math.min(totalImpact, 1.0);
     }
 
 
@@ -123,10 +123,10 @@ async function processGrid(gridId) {
 
     // --- Final Calculation ---
     // Combine and clamp
-    // E.g. (0.4 * news) + (0.6 * sos) + (0.2 * history) 
-    // Max sum ~1.2, clamped to 1.0.
+    // E.g. (0.25 * incident) + (0.65 * sos) + (0.1 * history) 
+    // Max sum ~1.0.
     
-    let finalScore = (W_NEWS * newsScore) + (W_SOS * sosScore) + (W_HISTORY * historyScore);
+    let finalScore = (W_INCIDENT * incidentScore) + (W_SOS * sosScore) + (W_HISTORY * historyScore);
     
     // Extra Logic: If there is an active SOS cluster, force HIGH risk regardless of history
     if (sosHighPriority >= 3) {

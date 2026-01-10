@@ -1,5 +1,6 @@
 const Incident = require('../models/Incident');
 const { CustomError } = require('../middlewares/errorMiddleware');
+const { updateRiskScores } = require('../services/riskEngineService');
 
 // @desc    Report a new incident (Crowdsourced)
 // @route   POST /api/incidents
@@ -34,6 +35,9 @@ exports.reportIncident = async (req, res, next) => {
         });
 
         const savedIncident = await newIncident.save();
+
+        // Trigger Real-time Risk Update
+        updateRiskScores().catch(err => console.error("Risk update failed:", err));
 
         res.status(201).json({
             success: true,

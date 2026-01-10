@@ -11,7 +11,7 @@ const sosRoutes = require('./routes/sosRoutes');
 const incidentRoutes = require('./routes/incidentRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
 const { updateRiskScores } = require('./services/riskEngineService');
-const { fetchNewsIncidents } = require('./services/newsService');
+// const { fetchNewsIncidents } = require('./services/newsService'); // News service disabled
 
 const app = express();
 const server = http.createServer(app);
@@ -59,7 +59,7 @@ server.listen(PORT, async() => {
   await connectDB();
 
   // Start Background Services
-  console.log("Starting Risk Engine & News Service...");
+  console.log("Starting Risk Engine...");
 
   const runJobs = async () => {
     try {
@@ -67,12 +67,14 @@ server.listen(PORT, async() => {
       // const activeCities = await Tourist.distinct('currentCity'); 
       // for(const city of activeCities) await fetchNewsIncidents(city);
       
-      // Example for Kashmir (Testing Dynamic City Support)
+      // News Service Disabled as per latest requirement
+      /*
       await fetchNewsIncidents({ 
         name: 'Kashmir', 
         lat: 34.0837, 
         lng: 74.7973 
       }); 
+      */
 
       await updateRiskScores();   // Recalculate risks globaly
     } catch (err) {
