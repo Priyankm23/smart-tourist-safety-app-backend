@@ -18,18 +18,21 @@ const server = http.createServer(app);
 // Initialize Socket.IO with the HTTP server
 // realTimeService.init(httpServer);
 
-app.use(cors());
+
+app.use(cors({
+    origin: true, // Allow all origins dynamically
+    credentials: true
+}));
 app.use(morgan('dev'));
+
 app.use(express.json({
   strict: true, // ensures invalid JSON is rejected
   limit: '1mb'
 }));
 
-// Allow both React App (5173) and our Test HTML (127.0.0.1:5500 usually via Live Server)
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5500', 'http://localhost:5500'], 
-  credentials: true,
-}));
+
+    // CORS configured above
+
 
 app.get("/",(req,res)=>{
   routes={

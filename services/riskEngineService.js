@@ -4,7 +4,7 @@ const SOSAlert = require('../models/SOSalert');
 
 // Constants
 const GRID_SIZE_DEG = 0.027; // Approx 3km (Increased from 500m to cover larger tourist spots)
-const LAMBDA = 0.05; // Time decay factor
+const LAMBDA = 0.01; // Time decay factor (Reduced for 7-day persistence)
 
 // Weights (Tuned to reduce News bias)
 const W_NEWS = 0.25;  // Reduced from 0.4
@@ -32,9 +32,9 @@ async function updateRiskScores() {
     // 1. Identify all grids that need updates (from recent activity or existing records)
     const activeGridIds = new Set();
     
-    // A. Grids with recent SOS alerts (last 24h)
+    // A. Grids with recent SOS alerts (last 7 days)
     const recentSOS = await SOSAlert.find({ 
-        timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } 
+        timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } 
     });
     recentSOS.forEach(alert => {
         if(alert.location && alert.location.coordinates) {
@@ -43,9 +43,9 @@ async function updateRiskScores() {
         }
     });
 
-    // B. Grids with recent Incidents (last 48h)
+    // B. Grids with recent Incidents (last 7 days)
     const recentIncidents = await Incident.find({
-        timestamp: { $gte: new Date(Date.now() - 48 * 60 * 60 * 1000) }
+        timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     });
     recentIncidents.forEach(inc => {
         if(inc.location && inc.location.coordinates) {
@@ -76,14 +76,14 @@ async function processGrid(gridId) {
     const lng = parseFloat(lngStr);
 
     // --- 1. SOS Cluster Component ---
-    // Count SOS alerts within 2000m radius (Increased from 500m for 3km grid) in last 30 minutes
+    // Count SOS alerts within 2000m radius in last 7 days (Extended from 30 mins)
     const sosHighPriority = await SOSAlert.countDocuments({
         location: {
             $geoWithin: {
                 $centerSphere: [ [lng, lat], 2000 / 6378100 ] // 2000 meters in radians
             }
         },
-        timestamp: { $gte: new Date(Date.now() - 30 * 60 * 1000) } 
+        timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } 
     });
     
     // 3 SOS alerts = Max Risk (1.0)
@@ -91,14 +91,14 @@ async function processGrid(gridId) {
 
 
     // --- 2. News/Incident Component ---
-    // Search larger radius (3.5km) for news (Increased from 1km), decays over 24h
+    // Search larger radius (3.5km) for news, decays over 7 days (Extended from 24h)
     const incidents = await Incident.find({
         location: {
             $geoWithin: {
                 $centerSphere: [ [lng, lat], 3500 / 6378100 ] // 3500 meters in radians
             }
         },
-        timestamp: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        timestamp: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
     });
     
     let newsScore = 0;
