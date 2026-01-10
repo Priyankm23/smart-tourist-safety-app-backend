@@ -8,7 +8,8 @@ const riskGridSchema = new mongoose.Schema({
   },
   riskScore: { type: Number, default: 0, min: 0, max: 1 },
   lastUpdated: { type: Date, default: Date.now },
-  riskLevel: { type: String, enum: ["Low", "Medium", "High", "Very High"], default: "Low" }
+  riskLevel: { type: String, enum: ["Low", "Medium", "High", "Very High"], default: "Low" },
+  gridName: { type: String, default: "Unknown Zone" } // Human readable name
 });
 
 // Index for geospatial queries

@@ -17,5 +17,6 @@ module.exports={
     CLOUDINARY_KEY,
     CLOUDINARY_SECRET,
     ENCRYPTION_KEY,
-    NEWS_API_KEY
+    NEWS_API_KEY,
+    MAPBOX_ACCESS_TOKEN
 }=process.env

@@ -152,6 +152,7 @@ exports.getDynamicRiskZones = async (req, res, next) => {
                 gridId: g.gridId,
                 riskScore: g.riskScore,
                 riskLevel: g.riskLevel,
+                gridName: g.gridName, // Include Name
                 lastUpdated: g.lastUpdated
             },
             geometry: g.location // Send the Center Point directly

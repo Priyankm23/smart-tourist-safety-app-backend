@@ -1,6 +1,7 @@
 const RiskGrid = require('../models/RiskGrid');
 const Incident = require('../models/Incident');
 const SOSAlert = require('../models/SOSalert');
+const { getGridName } = require('../utils/mapboxClient');
 
 // Constants
 const GRID_SIZE_DEG = 0.0045; // Approx 500m (Reverted from 3km)
@@ -121,12 +122,24 @@ async function processGrid(gridId) {
 
     // --- 3. Historical Component ---
     let historyScore = 0;
+    let gridName = null;
+    
     const prevGrid = await RiskGrid.findOne({ gridId });
     if (prevGrid) {
         // Get previous score but apply time decay
         // If no new events, this will slowly drag the score down to 0
         const hoursSinceUpdate = (Date.now() - prevGrid.lastUpdated) / (1000 * 60 * 60);
         historyScore = prevGrid.riskScore * Math.exp(-0.1 * hoursSinceUpdate); 
+        
+        // Preserve existing name to avoid API calls
+        if (prevGrid.gridName && !prevGrid.gridName.startsWith('Zone [')) {
+            gridName = prevGrid.gridName;
+        }
+    }
+
+    // Fetch Name from Mapbox if missing
+    if (!gridName) {
+        gridName = await getGridName(lat, lng);
     }
 
     // --- Final Calculation ---
@@ -152,7 +165,6 @@ async function processGrid(gridId) {
 
     finalScore = Math.min(Math.max(finalScore, 0), 1);
 
-    // Map to Levels
     let level = 'Low';
     if (finalScore >= 0.8) level = 'Very High';
     else if (finalScore >= 0.6) level = 'High';
