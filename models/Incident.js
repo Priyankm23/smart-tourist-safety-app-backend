@@ -5,7 +5,6 @@ const incidentSchema = new mongoose.Schema({
   type: { 
     type: String, 
     enum: ['theft', 'assault', 'accident', 'riot', 'natural_disaster', 'other'],
-    required: true
   },
   location: {
     type: { type: String, enum: ['Point'], default: 'Point' },

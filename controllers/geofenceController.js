@@ -124,12 +124,14 @@ exports.getDynamicRiskZones = async (req, res, next) => {
   try {
     const { lat, lng, radius = 5000 } = req.query; 
 
-    // Config: Grid size (must match service) - NOW 3KM
-    const GRID_SIZE_DEG = 0.027; 
+    // Config: Grid size (must match service) - NOW 500m
+    const GRID_SIZE_DEG = 0.0045; 
+
 
     let grids;
     if (!lat || !lng) {
-      grids = await RiskGrid.find({ riskScore: { $gt: 0.1 } }).limit(100);
+      // Return ALL grids regardless of score so the frontend sees everything in the database
+      grids = await RiskGrid.find({}).limit(100);
     } else {
       grids = await RiskGrid.find({
         location: {

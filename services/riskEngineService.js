@@ -3,7 +3,7 @@ const Incident = require('../models/Incident');
 const SOSAlert = require('../models/SOSalert');
 
 // Constants
-const GRID_SIZE_DEG = 0.027; // Approx 3km (Increased from 500m to cover larger tourist spots)
+const GRID_SIZE_DEG = 0.0045; // Approx 500m (Reverted from 3km)
 const LAMBDA = 0.01; // Time decay factor (Reduced for 7-day persistence)
 
 // Weights (Tuned to reduce News bias)

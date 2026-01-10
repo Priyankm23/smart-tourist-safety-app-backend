@@ -8,6 +8,7 @@ const authRoutes = require('./routes/authRoutes');
 const touristRoutes = require('./routes/touristRoutes');
 const authorityRoutes = require('./routes/authorityRoutes');
 const sosRoutes = require('./routes/sosRoutes');
+const incidentRoutes = require('./routes/incidentRoutes');
 const geofenceRoutes = require('./routes/geofenceRoutes');
 const { updateRiskScores } = require('./services/riskEngineService');
 const { fetchNewsIncidents } = require('./services/newsService');
@@ -17,7 +18,6 @@ const server = http.createServer(app);
 
 // Initialize Socket.IO with the HTTP server
 // realTimeService.init(httpServer);
-
 
 app.use(cors({
     origin: true, // Allow all origins dynamically
@@ -30,9 +30,7 @@ app.use(express.json({
   limit: '1mb'
 }));
 
-
-    // CORS configured above
-
+  // CORS configured above
 
 app.get("/",(req,res)=>{
   routes={
@@ -41,7 +39,8 @@ app.get("/",(req,res)=>{
     "heatmap":"/api/heatmap",
     "authority":"/api/authority",
     "geofence":"/api/geofence",
-    "sos":"/api/sos"
+    "sos":"/api/sos",
+    "incidents": "/api/incidents"
   }
   res.status(200).json({message:"tourist safety main aapka swagat hai !",routes:routes});
 })
@@ -52,6 +51,7 @@ app.use('/api/heatmap', authorityRoutes);
 app.use('/api/authority',authorityRoutes);
 app.use('/api/geofence', geofenceRoutes);
 app.use('/api/sos',sosRoutes);
+app.use('/api/incidents', incidentRoutes);
 
 // === Server Start ===
 server.listen(PORT, async() => {
