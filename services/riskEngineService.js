@@ -102,10 +102,18 @@ async function processGrid(gridId) {
     });
     
     let incidentScore = 0;
+    let maxIncidentSeverity = 0; // Track the single highest severity event
+
     if (incidents.length > 0) {
         const totalImpact = incidents.reduce((acc, inc) => {
             const hoursAgo = (Date.now() - inc.timestamp) / (1000 * 60 * 60);
-            return acc + (inc.severity * Math.exp(-LAMBDA * hoursAgo));
+            
+            // Track max severity for override logic later
+            // We also apply time decay to this max check so old severe events fade away
+            const currentSeverity = inc.severity * Math.exp(-LAMBDA * hoursAgo);
+            if(currentSeverity > maxIncidentSeverity) maxIncidentSeverity = currentSeverity;
+
+            return acc + currentSeverity;
         }, 0);
         incidentScore = Math.min(totalImpact, 1.0);
     }
@@ -131,6 +139,15 @@ async function processGrid(gridId) {
     // Extra Logic: If there is an active SOS cluster, force HIGH risk regardless of history
     if (sosHighPriority >= 3) {
         finalScore = Math.max(finalScore, 0.85); // Force Very High
+    }
+
+    // Critical Incident Override: 
+    // If a single incident is very severe (e.g. Riot > 0.8), force High/Very High immediately 
+    // regardless of the weighted average.
+    if (maxIncidentSeverity > 0.8) {
+        finalScore = Math.max(finalScore, 0.85); // Force Very High
+    } else if (maxIncidentSeverity > 0.6) {
+        finalScore = Math.max(finalScore, 0.65); // Force High
     }
 
     finalScore = Math.min(Math.max(finalScore, 0), 1);
