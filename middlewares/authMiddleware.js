@@ -22,7 +22,8 @@ function isTourist(req, res, next) {
 }
 
 function isAuthority(req, res, next) {
-  if (req.user?.role === "authority") return next();
+  const allowedRoles = ["Police Officer", "Tourism Officer", "Emergency Responder", "Admin", "authority"];
+  if (allowedRoles.includes(req.user?.role)) return next();
   res.status(403).json({ message: "Requires Authority role" });
 }
 
