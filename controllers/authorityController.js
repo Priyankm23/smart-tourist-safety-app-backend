@@ -8,6 +8,7 @@ const Incident = require('../models/Incident');
 const RiskGrid = require('../models/RiskGrid');
 const Authority = require('../models/Authority');
 const jwt = require('jsonwebtoken');
+const { NODE_ENV } = require('../config/config')
 
 // @desc    Get aggregated dashboard statistics
 // @route   GET /api/authority/dashboard-stats
