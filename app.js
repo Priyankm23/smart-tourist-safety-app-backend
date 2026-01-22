@@ -65,37 +65,49 @@ app.use("/api/sos", sosRoutes);
 app.use("/api/incidents", incidentRoutes);
 
 // === Server Start ===
-server.listen(PORT, async () => {
-  console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
-  await connectDB();
+const startServer = async () => {
+  try {
+    // 1. Connect to Database FIRST
+    await connectDB();
 
-  // Start Background Services
-  console.log("Starting Risk Engine...");
+    // 2. Start Request Listening
+    server.listen(PORT, () => {
+      console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
 
-  const runJobs = async () => {
-    try {
-      // Future Enhancement: Get list of active tourist cities from DB
-      // const activeCities = await Tourist.distinct('currentCity');
-      // for(const city of activeCities) await fetchNewsIncidents(city);
+      // Start Background Services
+      console.log("Starting Risk Engine...");
 
-      // News Service Disabled as per latest requirement
-      /*
-      await fetchNewsIncidents({ 
-        name: 'Kashmir', 
-        lat: 34.0837, 
-        lng: 74.7973 
-      }); 
-      */
+      const runJobs = async () => {
+        try {
+          // Future Enhancement: Get list of active tourist cities from DB
+          // const activeCities = await Tourist.distinct('currentCity');
+          // for(const city of activeCities) await fetchNewsIncidents(city);
 
-      await updateRiskScores(); // Recalculate risks globaly
-    } catch (err) {
-      console.error("Job Error:", err);
-    }
-  };
+          // News Service Disabled as per latest requirement
+          /*
+          await fetchNewsIncidents({ 
+            name: 'Kashmir', 
+            lat: 34.0837, 
+            lng: 74.7973 
+          }); 
+          */
 
-  // Run on startup
-  runJobs();
+          await updateRiskScores(); // Recalculate risks globaly
+        } catch (err) {
+          console.error("Job Error:", err);
+        }
+      };
 
-  // Schedule every 30 mins
-  setInterval(runJobs, 30 * 60 * 1000);
-});
+      // Run on startup
+      runJobs();
+
+      // Schedule every 30 mins
+      setInterval(runJobs, 30 * 60 * 1000);
+    });
+  } catch (err) {
+    console.error("Failed to connect to Database. Server shutting down.", err);
+    process.exit(1);
+  }
+};
+
+startServer();

@@ -13,3 +13,5 @@ mock-auth-flow.html
 *.txt
 
 testFile.js
+
+test-db-connection.js
