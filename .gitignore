@@ -8,5 +8,8 @@ dynamic-danger-zone.md
 
 test-map.html
 
+*.md
+mock-auth-flow.html
+*.txt
 
 testFile.js

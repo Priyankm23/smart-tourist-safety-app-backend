@@ -7,11 +7,24 @@ const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const blockchain = require("../services/blockchainService.js");
 
-const { JWT_SECRET , JWT_EXPIRES_IN} = require("../config/config")
+const { JWT_SECRET, JWT_EXPIRES_IN } = require("../config/config");
 
 exports.registerTourist = async (req, res) => {
   try {
-    const { name, govId, phone, email, dayWiseItinerary, tripMembers,  emergencyContact, password, language, tripEndDate } = req.body;
+    const {
+      name,
+      govId,
+      phone,
+      email,
+      dayWiseItinerary,
+      tripMembers,
+      emergencyContact,
+      password,
+      language,
+      tripEndDate,
+      role,
+      preferences,
+    } = req.body;
     const { consent } = req.body;
 
     // Basic validation
@@ -19,33 +32,28 @@ exports.registerTourist = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const existingTourist=await Tourist.findOne({email})
+    const existingTourist = await Tourist.findOne({ email });
 
-        if(existingTourist){
-            const error=new Error('tourist already exists')
-            error.statusCode=409
-            throw error
-        }
+    if (existingTourist) {
+      const error = new Error("tourist already exists");
+      error.statusCode = 409;
+      throw error;
+    }
 
     // Generate internal touristId
-    const touristId = "T" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 999);
+    const touristId =
+      "T" + Math.floor(Date.now() / 1000) + Math.floor(Math.random() * 999);
 
     // Encrypt sensitive fields
     const nameEnc = encrypt(name);
     const phoneEnc = encrypt(phone);
-    const dayWiseItineraryEnc = dayWiseItinerary
-  ? encrypt(JSON.stringify(dayWiseItinerary))
-      : null;
-    
-    // Check encryption and decryption right away
-    if (dayWiseItineraryEnc) {
-      console.log("Encrypted itinerary:", dayWiseItineraryEnc);
-    
-      const decryptedItinerary = JSON.parse(decrypt(dayWiseItineraryEnc));
-      console.log("Decrypted itinerary:", decryptedItinerary);
-    
-      console.log("Match check:", JSON.stringify(dayWiseItinerary) === JSON.stringify(decryptedItinerary));
-    }
+
+    // Only process itinerary if provided (Solo travelers or one-step flow)
+    const dayWiseItineraryEnc =
+      dayWiseItinerary && dayWiseItinerary.length > 0
+        ? encrypt(JSON.stringify(dayWiseItinerary))
+        : []; // Default to empty array for Admins/Members initially
+
     const tripMembersEnc = tripMembers
       ? encrypt(JSON.stringify(tripMembers))
       : null;
@@ -61,27 +69,35 @@ exports.registerTourist = async (req, res) => {
 
     // Deterministic fields for blockchain/audit
     const registeredAtIso = new Date().toISOString();
-    const dayWiseItineraryHash = sha256Hex(JSON.stringify(dayWiseItinerary || ""));
+    // Use empty string hash if no itinerary yet
+    const dayWiseItineraryHash = sha256Hex(
+      JSON.stringify(dayWiseItinerary || ""),
+    );
     const payload = `${touristId}|${govIdHash}|${dayWiseItineraryHash}|${registeredAtIso}`;
     const payloadHash = sha256Hex(payload);
 
     // Create Tourist record
     const tourist = new Tourist({
       touristId,
+      role: role || "solo", // Default to solo
       nameEncrypted: nameEnc,
       govIdHash,
       phoneEncrypted: phoneEnc,
-      email, // plain email for login
+      email,
       dayWiseItineraryEncrypted: dayWiseItineraryEnc,
       tripMembersEncrypted: tripMembersEnc,
       emergencyContactEncrypted: emergencyEnc,
       passwordHash,
       language: language || "en",
       safetyScore: 100,
+
+      // Preferences for Commuters (Safe Pulse / Routes)
+      preferences: preferences || {},
+
       consent: {
         tracking: consent?.tracking || false,
         dataRetention: consent?.dataRetention || false,
-        emergencySharing: consent?.emergencySharing || false
+        emergencySharing: consent?.emergencySharing || false,
       },
       createdAt: new Date(),
       expiresAt: tripEndDate ? new Date(tripEndDate) : null,
@@ -89,7 +105,7 @@ exports.registerTourist = async (req, res) => {
 
     await tourist.save();
 
-    // Blockchain push
+    // Blockchain push - Proceed regardless of itinerary presence (Log Identity Creation)
     const { v4: uuidv4 } = require("uuid");
     const eventIdRaw = uuidv4() + "|" + touristId;
     const eventIdHash = sha256Hex(eventIdRaw);
@@ -98,11 +114,10 @@ exports.registerTourist = async (req, res) => {
 
     let txHash;
     try {
-      txHash = await blockchain.storeEvent(eventIdBytes32, payloadHashBytes32); // match contract function name
-      if(txHash){
+      txHash = await blockchain.storeEvent(eventIdBytes32, payloadHashBytes32);
+      if (txHash) {
         console.log("transaction hash returned correctly");
       }
-     
     } catch (err) {
       console.error("Blockchain tx failed:", err);
       txHash = null;
@@ -112,25 +127,36 @@ exports.registerTourist = async (req, res) => {
       regHash: payloadHash,
       regTxHash: txHash || "not-recorded",
       eventId: eventIdHash,
-      dayWiseItineraryHash: dayWiseItineraryHash,
-      registeredAtIso: registeredAtIso
+      dayWiseItineraryHash: dayWiseItineraryHash, // might be empty hash for admins
+      registeredAtIso: registeredAtIso,
     };
 
     await tourist.save();
 
+    // Generate Token for immediate login
+    const tokenPayload = {
+      touristId: tourist.touristId,
+      id: tourist._id,
+      role: tourist.role,
+    };
+    const token = jwt.sign(tokenPayload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
     return res.status(201).json({
+      message: "Registered successfully.",
       touristId,
-      message: "Registered. Digital ID created.",
+      token,
+      role: tourist.role,
       audit: {
         regHash: payloadHash,
         regTxHash: txHash,
-        eventId: eventIdHash
-      }
+        eventId: eventIdHash,
+      },
     });
-
   } catch (err) {
     console.error("registerTourist error", err);
-     if (err.statusCode && err.message) {
+    if (err.statusCode && err.message) {
       return res.status(err.statusCode).json({ error: err.message });
     }
     return res.status(500).json({ error: "Internal server error" });
@@ -159,20 +185,24 @@ exports.loginTourist = async (req, res) => {
 
     // ✅ Generate JWT
     const payload = {
+      id: tourist._id, // Standardize to id
       touristId: tourist.touristId,
-      language: tourist.language
+      role: tourist.role || "solo",
+      language: tourist.language,
     };
 
     const token = jwt.sign(payload, JWT_SECRET, {
-      expiresIn: JWT_EXPIRES_IN
+      expiresIn: JWT_EXPIRES_IN,
     });
 
     return res.status(200).json({
       message: "Login successful",
       touristId: tourist.touristId,
-      token
+      role: tourist.role || "solo",
+      groupId: tourist.groupId,
+      ownedGroupId: tourist.ownedGroupId,
+      token,
     });
-
   } catch (err) {
     console.error("loginTourist error:", err);
     return res.status(500).json({ error: "Internal server error" });

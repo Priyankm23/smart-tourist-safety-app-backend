@@ -1,0 +1,145 @@
+const TourGroup = require("../models/TourGroup");
+const Tourist = require("../models/Tourist");
+const { generateAccessCode } = require("../utils/hash"); // Helper or just Math.random
+
+exports.createGroup = async (req, res, next) => {
+  try {
+    const { groupName, startDate, endDate, itinerary } = req.body;
+    const adminId = req.user.id; //From authMiddleware
+
+    if (!groupName || !startDate || !endDate || !itinerary) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required group details" });
+    }
+
+    // Generate simple 6-char Access Code
+    const accessCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const newGroup = new TourGroup({
+      groupName,
+      accessCode,
+      startDate,
+      endDate,
+      adminId,
+      itinerary: itinerary, // Expects the Node-Based Format directly
+      members: [],
+    });
+
+    await newGroup.save();
+
+    // Update Admin User
+    await Tourist.findByIdAndUpdate(adminId, {
+      role: "tour-admin",
+      ownedGroupId: newGroup._id,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Group created successfully",
+      data: {
+        groupId: newGroup._id,
+        accessCode: newGroup.accessCode,
+        groupName: newGroup.groupName,
+      },
+    });
+  } catch (err) {
+    console.error("createGroup error:", err);
+    next(err);
+  }
+};
+
+exports.joinGroup = async (req, res, next) => {
+  try {
+    const { accessCode } = req.body;
+    const userId = req.user.id;
+
+    const group = await TourGroup.findOne({ accessCode, isActive: true });
+    if (!group) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid or inactive Access Code" });
+    }
+
+    // Check if already a member
+    const alreadyMember = group.members.some(
+      (m) => m.touristId.toString() === userId,
+    );
+    if (alreadyMember) {
+      return res.status(400).json({
+        success: false,
+        message: "You are already a member of this group",
+      });
+    }
+
+    // Add to Group with default valid coordinates to satisfy 2dsphere index
+    group.members.push({
+      touristId: userId,
+      status: "active",
+      lastKnownLocation: {
+        type: "Point",
+        coordinates: [0, 0],
+      },
+    });
+    await group.save();
+
+    // Update User Profile
+    await Tourist.findByIdAndUpdate(userId, {
+      role: "group-member",
+      groupId: group._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Joined group: ${group.groupName}`,
+      data: {
+        groupId: group._id,
+        groupName: group.groupName,
+      },
+    });
+  } catch (err) {
+    console.error("joinGroup error:", err);
+    next(err);
+  }
+};
+
+exports.getGroupDashboard = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const tourist = await Tourist.findById(userId);
+
+    // Determine which Group ID to look up
+    const targetGroupId =
+      tourist.role === "tour-admin" ? tourist.ownedGroupId : tourist.groupId;
+
+    if (!targetGroupId) {
+      return res.status(404).json({
+        success: false,
+        message: "No active group found for this user",
+      });
+    }
+
+    const group = await TourGroup.findById(targetGroupId)
+      .populate(
+        "members.touristId",
+        "touristId nameEncrypted phoneEncrypted safetyScore consent",
+      ) // Populate minimal info
+      .lean();
+
+    if (!group) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Group not found" });
+    }
+
+    // Logic to decrypt member names for response if needed (omitted for brevity, keep names encrypted or decrypt here)
+
+    res.status(200).json({
+      success: true,
+      data: group,
+    });
+  } catch (err) {
+    console.error("getGroupDashboard error:", err);
+    next(err);
+  }
+};
