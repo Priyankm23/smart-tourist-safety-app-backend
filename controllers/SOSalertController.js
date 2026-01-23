@@ -171,7 +171,7 @@ exports.triggerSOS = async (req, res) => {
     // 6️⃣ AFTER response: Sequentially log alerts on blockchain
     (async () => {
       try {
-        const { v4: uuidv4 } = require("uuid");
+        const { v4: uuidv4 } = await import("uuid");
         const signer = contract.runner;
 
         // Create payload for this alert
