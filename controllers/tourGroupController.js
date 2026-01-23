@@ -143,3 +143,72 @@ exports.getGroupDashboard = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.updateGroupItinerary = async (req, res, next) => {
+  try {
+    const { itinerary } = req.body;
+    const userId = req.user.id;
+
+    if (!itinerary) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing itinerary data" });
+    }
+
+    // Find the user to determine their group
+    const user = await Tourist.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Determine groupId based on role
+    let groupId = null;
+    if (user.role === "tour-admin") {
+      groupId = user.ownedGroupId;
+    } else {
+      groupId = user.groupId;
+    }
+
+    if (!groupId) {
+      return res.status(404).json({
+        success: false,
+        message: "No group found for this user.",
+      });
+    }
+
+    // Find the group and check if user is a member or admin
+    const group = await TourGroup.findById(groupId);
+    if (!group) {
+      return res.status(404).json({
+        success: false,
+        message: "Group not found.",
+      });
+    }
+
+    // Check if user is admin or a member of the group
+    const isAdmin = group.adminId.toString() === userId;
+    const isMember = group.members.some(m => m.touristId.toString() === userId);
+    if (!isAdmin && !isMember) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this group's itinerary.",
+      });
+    }
+
+    // Update itinerary
+    group.itinerary = itinerary;
+    await group.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Itinerary updated successfully",
+      data: {
+        groupId: group._id,
+        itinerary: group.itinerary,
+      },
+    });
+  } catch (err) {
+    console.error("updateGroupItinerary error:", err);
+    next(err);
+  }
+};
