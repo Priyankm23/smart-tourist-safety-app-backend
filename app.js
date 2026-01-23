@@ -26,7 +26,7 @@ app.use(
     credentials: true,
   }),
 );
-app.use(morgan("dev"));
+app.use(morgan("combined"));
 
 app.use(
   express.json({
