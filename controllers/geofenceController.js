@@ -1,6 +1,6 @@
 const Transition = require('../models/Transition');
 const { CustomError } = require('../middlewares/errorMiddleware');
-const  DangerZone  = require('../models/Geofence');
+const DangerZone = require('../models/Geofence');
 const RiskGrid = require('../models/RiskGrid');
 const { updateRiskScores } = require('../services/riskEngineService');
 
@@ -14,7 +14,7 @@ exports.receiveGeofenceTransitions = async (req, res, next) => {
     if (!Array.isArray(transitions)) {
       return next(new CustomError(400, 'Transitions must be an array.'));
     }
-    
+
     if (transitions.length === 0) {
       return res.status(200).json({ insertedCount: 0 });
     }
@@ -27,37 +27,37 @@ exports.receiveGeofenceTransitions = async (req, res, next) => {
     }));
 
     const result = await Transition.insertMany(docs);
-    
+
     // Check for Danger Zone Entry Alerts
     const alerts = [];
     for (const t of docs) {
-        if (t.location && t.location.latitude && t.location.longitude) {
-            const lat = t.location.latitude;
-            const lng = t.location.longitude;
-            
-            // Find if this location is inside a High Risk Grid
-            // Using a slightly smaller distance to be more precise about "entry" if needed, 
-            // but 500m matches grid radius roughly.
-            const riskGrid = await RiskGrid.findOne({
-                location: {
-                    $near: {
-                        $geometry: { type: "Point", coordinates: [lng, lat] },
-                        $maxDistance: 500 
-                    }
-                }
-            });
+      if (t.location && t.location.latitude && t.location.longitude) {
+        const lat = t.location.latitude;
+        const lng = t.location.longitude;
 
-            if (riskGrid && (riskGrid.riskLevel === 'High' || riskGrid.riskLevel === 'Very High')) {
-                alerts.push({
-                    type: 'DANGER_ZONE_ENTRY',
-                    message: `Warning: You have entered a ${riskGrid.riskLevel} Risk Zone.`,
-                    riskLevel: riskGrid.riskLevel,
-                    location: { lat, lng }
-                });
+        // Find if this location is inside a High Risk Grid
+        // Using a slightly smaller distance to be more precise about "entry" if needed, 
+        // but 500m matches grid radius roughly.
+        const riskGrid = await RiskGrid.findOne({
+          location: {
+            $near: {
+              $geometry: { type: "Point", coordinates: [lng, lat] },
+              $maxDistance: 500
             }
+          }
+        });
+
+        if (riskGrid && (riskGrid.riskLevel === 'High' || riskGrid.riskLevel === 'Very High')) {
+          alerts.push({
+            type: 'DANGER_ZONE_ENTRY',
+            message: `Warning: You have entered a ${riskGrid.riskLevel} Risk Zone.`,
+            riskLevel: riskGrid.riskLevel,
+            location: { lat, lng }
+          });
         }
+      }
     }
-    
+
     res.status(201).json({
       message: 'Geofence transitions received successfully.',
       insertedCount: result.insertedCount,
@@ -68,30 +68,28 @@ exports.receiveGeofenceTransitions = async (req, res, next) => {
   }
 };
 
-exports.createGeoFenceToDangerLocation = async ( req, res, next) =>{
+exports.createGeoFenceToDangerLocation = async (req, res, next) => {
   try {
     const dangerZone = new DangerZone(req.body);
     await dangerZone.save();
     res.status(201).json({ message: "Danger zone saved successfully", data: dangerZone });
   } catch (error) {
     console.error("Error saving danger zone:", error);
-    res.status(500).json({ error: error.message });
     next(error);
   }
 };
 
-exports.getallZones = async ( req, res, next ) =>{
+exports.getallZones = async (req, res, next) => {
   try {
     const zones = await DangerZone.find();
     res.json(zones);
   } catch (err) {
     console.error("Error fetching danger zones:", err);
-    res.status(500).json({ error: "Internal server error" });
-    next(error);
+    next(err);
   }
 }
 
-exports.getZonebyId = async ( req, res, next) =>{
+exports.getZonebyId = async (req, res, next) => {
   try {
     const zone = await DangerZone.findOne({ id: req.params.id });
     if (!zone) {
@@ -100,8 +98,7 @@ exports.getZonebyId = async ( req, res, next) =>{
     res.json(zone);
   } catch (err) {
     console.error("Error fetching danger zone:", err);
-    res.status(500).json({ error: "Internal server error" });
-    next(error);
+    next(err);
   }
 }
 
@@ -115,17 +112,16 @@ exports.getHighRiskZoneCount = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Error counting high-risk zones:", error);
-    res.status(500).json({ error: "Internal server error" });
     next(error);
   }
 };
 
 exports.getDynamicRiskZones = async (req, res, next) => {
   try {
-    const { lat, lng, radius = 5000 } = req.query; 
+    const { lat, lng, radius = 5000 } = req.query;
 
     // Config: Grid size (must match service) - NOW 500m
-    const GRID_SIZE_DEG = 0.0045; 
+    const GRID_SIZE_DEG = 0.0045;
 
 
     let grids;
@@ -136,7 +132,7 @@ exports.getDynamicRiskZones = async (req, res, next) => {
       grids = await RiskGrid.find({
         location: {
           $geoWithin: {
-             $centerSphere: [ [parseFloat(lng), parseFloat(lat)], parseInt(radius) / 6378100 ]
+            $centerSphere: [[parseFloat(lng), parseFloat(lat)], parseInt(radius) / 6378100]
           }
         }
       });
@@ -145,18 +141,18 @@ exports.getDynamicRiskZones = async (req, res, next) => {
     // Transform to GeoJSON FEATURE COLLECTION
     // Sending POINT geometry now, so frontend can draw CIRCLES
     const geoJSON = {
-        type: "FeatureCollection",
-        features: grids.map(g => ({
-            type: "Feature",
-            properties: {
-                gridId: g.gridId,
-                riskScore: g.riskScore,
-                riskLevel: g.riskLevel,
-                gridName: g.gridName, // Include Name
-                lastUpdated: g.lastUpdated
-            },
-            geometry: g.location // Send the Center Point directly
-        }))
+      type: "FeatureCollection",
+      features: grids.map(g => ({
+        type: "Feature",
+        properties: {
+          gridId: g.gridId,
+          riskScore: g.riskScore,
+          riskLevel: g.riskLevel,
+          gridName: g.gridName, // Include Name
+          lastUpdated: g.lastUpdated
+        },
+        geometry: g.location // Send the Center Point directly
+      }))
     };
 
     res.json(geoJSON);
@@ -166,10 +162,10 @@ exports.getDynamicRiskZones = async (req, res, next) => {
 };
 
 exports.triggerRiskUpdate = async (req, res, next) => {
-    try {
-        await updateRiskScores();
-        res.json({ message: "Risk scores updated successfully." });
-    } catch (error) {
-        next(error);
-    }
+  try {
+    await updateRiskScores();
+    res.json({ message: "Risk scores updated successfully." });
+  } catch (error) {
+    next(error);
+  }
 };

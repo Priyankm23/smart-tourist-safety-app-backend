@@ -11,6 +11,8 @@ const authorityRoutes = require("./routes/authorityRoutes");
 const sosRoutes = require("./routes/sosRoutes");
 const incidentRoutes = require("./routes/incidentRoutes");
 const geofenceRoutes = require("./routes/geofenceRoutes");
+const itineraryRoutes = require("./routes/itineraryRoutes");
+const { errorHandler } = require("./middlewares/errorMiddleware");
 const { updateRiskScores } = require("./services/riskEngineService");
 // const { fetchNewsIncidents } = require('./services/newsService'); // News service disabled
 
@@ -26,7 +28,7 @@ app.use(
     credentials: true,
   }),
 );
-app.use(morgan("combined"));
+app.use(morgan("dev"));
 
 app.use(
   express.json({
@@ -41,11 +43,11 @@ app.get("/", (req, res) => {
   routes = {
     authenticatioin: "/api/auth",
     tourist: "/api/tourist",
-    heatmap: "/api/heatmap",
     authority: "/api/authority",
     geofence: "/api/geofence",
     sos: "/api/sos",
     incidents: "/api/incidents",
+    tourgroup: "/api/group"
   };
   res
     .status(200)
@@ -58,11 +60,14 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/tourist", touristRoutes);
 app.use("/api/group", tourGroupRoutes);
-app.use("/api/heatmap", authorityRoutes);
 app.use("/api/authority", authorityRoutes);
 app.use("/api/geofence", geofenceRoutes);
 app.use("/api/sos", sosRoutes);
 app.use("/api/incidents", incidentRoutes);
+app.use("/api/itinerary", itineraryRoutes);
+
+// Register global error handler (must come after all route registrations)
+app.use(errorHandler);
 
 // === Server Start ===
 const startServer = async () => {

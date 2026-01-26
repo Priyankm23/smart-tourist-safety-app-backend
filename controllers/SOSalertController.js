@@ -6,7 +6,7 @@ const { sha256Hex } = require("../utils/hash.js"); // your existing hash utility
 const { POLYGON_RPC, PRIVATE_KEY, SMART_CONTRACT_ADDRESS_sos } = require("../config/config.js");
 const Tourist = require('../models/Tourist.js');
 const { decrypt } = require('../utils/encrypt.js');
-const SOSABI =  [
+const SOSABI = [
 	{
 		"anonymous": false,
 		"inputs": [
@@ -126,99 +126,99 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
  *   sosReason: { reason, weatherInfo, extra }
  * }
  */
-exports.triggerSOS = async (req, res) => {
-  try {
-    const { location, safetyScore, locationName, sosReason } = req.body;
-    const touristId = req.user.touristId;
+exports.triggerSOS = async (req, res, next) => {
+	try {
+		const { location, safetyScore, locationName, sosReason } = req.body;
+		const touristId = req.user.touristId;
 
-    // 1️⃣ Get tourist details
-    const tourist = await Tourist.findOne({ touristId });
-    if (!tourist) return res.status(404).json({ error: "Tourist not found" });
+		// 1️⃣ Get tourist details
+		const tourist = await Tourist.findOne({ touristId });
+		if (!tourist) return res.status(404).json({ error: "Tourist not found" });
 
-    // 2️⃣ Decrypt emergency contact
-    let emergencyContact = null;
-    if (tourist.emergencyContactEncrypted) {
-      emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
-    }
+		// 2️⃣ Decrypt emergency contact
+		let emergencyContact = null;
+		if (tourist.emergencyContactEncrypted) {
+			emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
+		}
 
-    // 3️⃣ Save SOS in MongoDB immediately
-    const sosAlert = new SOSAlert({
-      touristId: tourist._id,
-      location,
-      safetyScore,
-      locationName,
-      sosReason,
-      emergencyContact,
-      status: "new",
-    });
-    await sosAlert.save();
+		// 3️⃣ Save SOS in MongoDB immediately
+		const sosAlert = new SOSAlert({
+			touristId: tourist._id,
+			location,
+			safetyScore,
+			locationName,
+			sosReason,
+			emergencyContact,
+			status: "new",
+		});
+		await sosAlert.save();
 
-    // 4️⃣ Trigger Real-time Risk Update
-    updateRiskScores().catch(err => console.error("Risk update failed:", err));
+		// 4️⃣ Trigger Real-time Risk Update
+		updateRiskScores().catch(err => console.error("Risk update failed:", err));
 
-    // 5️⃣ Respond to client immediately
-    res.json({
-      success: true,
-      message: "SOS alert received. Authorities have been notified.",
-      sosAlert: {
-        id: sosAlert._id,
-        status: sosAlert.status,
-        location: sosAlert.location,
-        timestamp: sosAlert.timestamp,
-      },
-    });
+		// 5️⃣ Respond to client immediately
+		res.json({
+			success: true,
+			message: "SOS alert received. Authorities have been notified.",
+			sosAlert: {
+				id: sosAlert._id,
+				status: sosAlert.status,
+				location: sosAlert.location,
+				timestamp: sosAlert.timestamp,
+			},
+		});
 
-    // 6️⃣ AFTER response: Sequentially log alerts on blockchain
-    (async () => {
-      try {
-        const { v4: uuidv4 } = await import("uuid");
-        const signer = contract.runner;
+		// 6️⃣ AFTER response: Sequentially log alerts on blockchain
+		(async () => {
+			try {
+				const { v4: uuidv4 } = await import("uuid");
+				const signer = contract.runner;
 
-        // Create payload for this alert
-        const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
-        const eventIdHash = sha256Hex(eventIdRaw);
-        const alertId = hex64ToBytes32(eventIdHash);
+				// Create payload for this alert
+				const eventIdRaw = uuidv4() + "|" + sosAlert._id.toString();
+				const eventIdHash = sha256Hex(eventIdRaw);
+				const alertId = hex64ToBytes32(eventIdHash);
 
-        const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
-        const payloadHash = ethers.id(payloadString);
+				const payloadString = `${sosAlert._id}|${touristId}|${location.coordinates.join(",")}|${sosReason.reason}|${sosAlert.timestamp.toISOString()}`;
+				const payloadHash = ethers.id(payloadString);
 
-        console.log("📌 Logging SOS alert on-chain...");
+				console.log("📌 Logging SOS alert on-chain...");
 
-        // Wait for the previous transaction to finish before sending this one
-        if (!global.sosQueue) global.sosQueue = Promise.resolve();
+				// Wait for the previous transaction to finish before sending this one
+				if (!global.sosQueue) global.sosQueue = Promise.resolve();
 
-        global.sosQueue = global.sosQueue.then(async () => {
-          try {
-            const tx = await contract.logAlert(alertId, payloadHash);
-            const receipt = await tx.wait();
-        
-            // ⚡ Create a fresh reference to SOSAlert from DB to ensure correct scope
-            const alertToUpdate = await SOSAlert.findById(sosAlert._id);
-            if (!alertToUpdate) {
-              console.error("❌ SOSAlert not found in DB for updating blockchain info");
-              return;
-            }
-        
-            alertToUpdate.blockchainTxHash = receipt.hash;
-            alertToUpdate.isLoggedOnChain = true;
-            alertToUpdate.alertIdOnChain = alertId;
-            alertToUpdate.payloadHashOnChain = payloadHash;
-            await alertToUpdate.save();
-        
-            console.log("✅ SOS logged on-chain:", receipt.hash);
-          } catch (err) {
-            console.error("❌ Blockchain logging error:", err);
-          }
-        });
+				global.sosQueue = global.sosQueue.then(async () => {
+					try {
+						const tx = await contract.logAlert(alertId, payloadHash);
+						const receipt = await tx.wait();
 
-        await global.sosQueue; // ensure sequence
-      } catch (err) {
-        console.error("❌ triggerSOS blockchain async error:", err);
-      }
-    })();
+						// ⚡ Create a fresh reference to SOSAlert from DB to ensure correct scope
+						const alertToUpdate = await SOSAlert.findById(sosAlert._id);
+						if (!alertToUpdate) {
+							console.error("❌ SOSAlert not found in DB for updating blockchain info");
+							return;
+						}
 
-  } catch (err) {
-    console.error("❌ triggerSOS error:", err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
+						alertToUpdate.blockchainTxHash = receipt.hash;
+						alertToUpdate.isLoggedOnChain = true;
+						alertToUpdate.alertIdOnChain = alertId;
+						alertToUpdate.payloadHashOnChain = payloadHash;
+						await alertToUpdate.save();
+
+						console.log("✅ SOS logged on-chain:", receipt.hash);
+					} catch (err) {
+						console.error("❌ Blockchain logging error:", err);
+					}
+				});
+
+				await global.sosQueue; // ensure sequence
+			} catch (err) {
+				console.error("❌ triggerSOS blockchain async error:", err);
+			}
+		})();
+
+	} catch (err) {
+		console.error("❌ triggerSOS error:", err);
+		next(err);
+	}
 };

@@ -1,34 +1,5 @@
 const mongoose = require("mongoose");
-
-// Sub-schema for individual itinerary nodes (Locations)
-const ItineraryNodeSchema = new mongoose.Schema(
-  {
-    type: {
-      type: String,
-      enum: ["stay", "visit", "transit", "start", "end"],
-      required: true,
-    },
-    name: { type: String, required: true }, // Encryptable in future if needed
-    location: {
-      type: { type: String, default: "Point" },
-      coordinates: { type: [Number], required: true }, // [lng, lat] for GeoJSON
-    },
-    address: { type: String },
-    scheduledTime: { type: String }, // e.g., "14:00"
-    description: { type: String },
-  },
-  { _id: false },
-);
-
-// Sub-schema for a single day
-const DayAppointSchema = new mongoose.Schema(
-  {
-    date: { type: Date, required: true },
-    dayNumber: { type: Number, required: true },
-    nodes: [ItineraryNodeSchema], // Chronological list of stops
-  },
-  { _id: false },
-);
+const { DayAppointSchema } = require("./ItinerarySchemas");
 
 const TourGroupSchema = new mongoose.Schema({
   groupName: { type: String, required: true },
@@ -58,12 +29,13 @@ const TourGroupSchema = new mongoose.Schema({
       joinedAt: { type: Date, default: Date.now },
       status: {
         type: String,
-        enum: ["active", "inactive", " SOS"],
+        enum: ["active", "inactive", "SOS"],
         default: "active",
       },
       lastKnownLocation: {
         type: { type: String, default: "Point" },
-        coordinates: { type: [Number], default: [0, 0] },
+        // coordinates are optional. do not default to [0,0] which is a valid but meaningless location.
+        coordinates: { type: [Number] },
       },
     },
   ],
@@ -73,6 +45,11 @@ const TourGroupSchema = new mongoose.Schema({
 });
 
 // Index for geospatial queries on member locations (future proofing)
-TourGroupSchema.index({ "members.lastKnownLocation": "2dsphere" });
+// Use a partial index so only member documents that actually have coordinates are included.
+// This avoids Mongo errors when documents contain empty/missing coordinate arrays.
+TourGroupSchema.index(
+  { "members.lastKnownLocation": "2dsphere" },
+  { partialFilterExpression: { "members.lastKnownLocation.coordinates.0": { $exists: true } } }
+);
 
 module.exports = mongoose.model("TourGroup", TourGroupSchema);

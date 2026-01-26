@@ -253,46 +253,46 @@ exports.getTouristManagementData = async (req, res, next) => {
 // @route   DELETE /api/authority/revoke/:id
 // @access  Private (authority)
 exports.revokeTourist = async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
 
-      if (!reason) {
-        return res.status(400).json({ success: false, message: "Reason for revocation is required" });
-      }
-
-      // "if reason is either convicted to misbehave / status expired then only delete"
-      const normalizedReason = reason.toLowerCase();
-      const validReason =
-        normalizedReason.includes('misbehave') ||
-        normalizedReason.includes('convicted') ||
-        normalizedReason.includes('expired') ||
-        normalizedReason.includes('complete');
-
-      if (!validReason) {
-        return res.status(400).json({
-          success: false,
-          message: "Action denied. Valid reasons: 'Convicted/Misbehavior' or 'Status Expired/Trip Completed'."
-        });
-      }
-
-      const tourist = await Tourist.findById(id);
-
-      if (!tourist) {
-        return res.status(404).json({ success: false, message: "Tourist not found" });
-      }
-
-      await Tourist.findByIdAndDelete(id);
-
-      res.status(200).json({
-        success: true,
-        message: `Tourist ${tourist.touristId} has been revoked and removed.`
-      });
-
-    } catch (err) {
-      console.error("❌ revokeTourist error:", err);
-      next(err);
+    if (!reason) {
+      return res.status(400).json({ success: false, message: "Reason for revocation is required" });
     }
+
+    // "if reason is either convicted to misbehave / status expired then only delete"
+    const normalizedReason = reason.toLowerCase();
+    const validReason =
+      normalizedReason.includes('misbehave') ||
+      normalizedReason.includes('convicted') ||
+      normalizedReason.includes('expired') ||
+      normalizedReason.includes('complete');
+
+    if (!validReason) {
+      return res.status(400).json({
+        success: false,
+        message: "Action denied. Valid reasons: 'Convicted/Misbehavior' or 'Status Expired/Trip Completed'."
+      });
+    }
+
+    const tourist = await Tourist.findById(id);
+
+    if (!tourist) {
+      return res.status(404).json({ success: false, message: "Tourist not found" });
+    }
+
+    await Tourist.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: `Tourist ${tourist.touristId} has been revoked and removed.`
+    });
+
+  } catch (err) {
+    console.error("❌ revokeTourist error:", err);
+    next(err);
+  }
 };
 
 
@@ -310,117 +310,117 @@ exports.getMapOverview = async (req, res, next) => {
     // 2. Fetch Tourists with their latest location
     // We get the latest transition for each tourist to pinpoint them on the map
     const latestTransitions = await Transition.aggregate([
-        { $sort: { timestamp: -1 } },
-        { 
-            $group: { 
-                _id: "$digitalId", 
-                location: { $first: "$location" }, 
-                timestamp: { $first: "$timestamp" } 
-            } 
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$digitalId",
+          location: { $first: "$location" },
+          timestamp: { $first: "$timestamp" }
         }
+      }
     ]);
 
     // Create a map for quick lookup of location by touristId
     const locMap = {};
     latestTransitions.forEach(t => {
-        locMap[t._id] = t.location; // { latitude, longitude }
+      locMap[t._id] = t.location; // { latitude, longitude }
     });
 
     const touristsRaw = await Tourist.find({}).select('touristId nameEncrypted safetyScore expiresAt').lean();
-    
+
     const tourists = touristsRaw.map(t => {
-        const loc = locMap[t.touristId];
-        let name = "Unknown";
-        try {
-            if (t.nameEncrypted) name = decrypt(t.nameEncrypted);
-        } catch (e) {}
+      const loc = locMap[t.touristId];
+      let name = "Unknown";
+      try {
+        if (t.nameEncrypted) name = decrypt(t.nameEncrypted);
+      } catch (e) { }
 
-        const isActive = t.expiresAt && new Date(t.expiresAt) > new Date();
+      const isActive = t.expiresAt && new Date(t.expiresAt) > new Date();
 
-        // Let's exclude tourists with no location history for the map view.
-        if (!loc) return null;
+      // Let's exclude tourists with no location history for the map view.
+      if (!loc) return null;
 
-        return {
-            id: t.touristId,
-            name: name,
-            status: isActive ? 'active' : 'expired',
-            safetyScore: t.safetyScore,
-            location: {
-                lat: loc.latitude,
-                lng: loc.longitude
-            },
-            type: 'tourist'
-        };
+      return {
+        id: t.touristId,
+        name: name,
+        status: isActive ? 'active' : 'expired',
+        safetyScore: t.safetyScore,
+        location: {
+          lat: loc.latitude,
+          lng: loc.longitude
+        },
+        type: 'tourist'
+      };
     }).filter(t => t !== null);
 
 
     // 3. Fetch Danger Zones
     const zonesRaw = await DangerZone.find({}).lean();
     const zones = zonesRaw.map(z => ({
-        id: z.id,
-        name: z.name,
-        riskLevel: z.riskLevel,
-        type: 'zone',
-        shape: z.type, // 'circle' or 'polygon'
-        coordinates: z.coords, // [lat, lng]
-        radius: z.radiusKm ? z.radiusKm * 1000 : 0 // Convert to meters for map
+      id: z.id,
+      name: z.name,
+      riskLevel: z.riskLevel,
+      type: 'zone',
+      shape: z.type, // 'circle' or 'polygon'
+      coordinates: z.coords, // [lat, lng]
+      radius: z.radiusKm ? z.radiusKm * 1000 : 0 // Convert to meters for map
     }));
 
     // 4. Fetch Active SOS Alerts
     const alertsRaw = await SOSAlert.find({ status: { $in: ['new', 'responding'] } }).lean();
     const activeAlerts = alertsRaw.map(a => {
-        // SOSAlert uses GeoJSON [lng, lat]
-        const lat = a.location.coordinates[1];
-        const lng = a.location.coordinates[0];
-        return {
-            id: a._id,
-            type: 'alert',
-            status: a.status,
-            priority: a.safetyScore < 50 ? 'high' : 'medium',
-            location: { lat, lng },
-            locationName: a.location.locationName || "Unknown Location"
-        };
+      // SOSAlert uses GeoJSON [lng, lat]
+      const lat = a.location.coordinates[1];
+      const lng = a.location.coordinates[0];
+      return {
+        id: a._id,
+        type: 'alert',
+        status: a.status,
+        priority: a.safetyScore < 50 ? 'high' : 'medium',
+        location: { lat, lng },
+        locationName: a.location.locationName || "Unknown Location"
+      };
     });
 
     // 5. Fetch Risk Grids (Heatmap points)
     const riskGridRaw = await RiskGrid.find({ riskScore: { $gt: 0 } }).lean();
     const riskGrids = riskGridRaw.map(r => ({
-        location: {
-            lat: r.location.coordinates[1],
-            lng: r.location.coordinates[0]
-        },
-        intensity: r.riskScore // 0 to 1
+      location: {
+        lat: r.location.coordinates[1],
+        lng: r.location.coordinates[0]
+      },
+      intensity: r.riskScore // 0 to 1
     }));
-    
+
     // 6. Fetch Incidents
     const incidentsRaw = await Incident.find({}).sort({ timestamp: -1 }).limit(50).lean();
     const incidents = incidentsRaw.map(i => ({
-        id: i._id,
-        title: i.title,
-        type: 'incident',
-        category: i.type,
-        location: {
-            lat: i.location.coordinates[1],
-            lng: i.location.coordinates[0]
-        }
+      id: i._id,
+      title: i.title,
+      type: 'incident',
+      category: i.type,
+      location: {
+        lat: i.location.coordinates[1],
+        lng: i.location.coordinates[0]
+      }
     }));
 
 
     res.status(200).json({
-        success: true,
-        stats: {
-            totalTourists,
-            activeAlerts: activeAlertsCount,
-            highRiskZones: highRiskZonesCount,
-            responseUnits: responseUnitsCount
-        },
-        mapData: {
-            tourists,
-            zones,
-            activeAlerts,
-            riskGrids,  
-            incidents
-        }
+      success: true,
+      stats: {
+        totalTourists,
+        activeAlerts: activeAlertsCount,
+        highRiskZones: highRiskZonesCount,
+        responseUnits: responseUnitsCount
+      },
+      mapData: {
+        tourists,
+        zones,
+        activeAlerts,
+        riskGrids,
+        incidents
+      }
     });
 
   } catch (err) {
@@ -429,8 +429,8 @@ exports.getMapOverview = async (req, res, next) => {
   }
 };
 
-exports.signUp = async (req,res,next)=>{
-    try {
+exports.signUp = async (req, res, next) => {
+  try {
     const { username, fullName, email, password, role, authorityId } = req.body;
 
     if (!username || !fullName || !email || !password || !role) {
@@ -456,18 +456,18 @@ exports.signUp = async (req,res,next)=>{
     const newUser = new Authority({ username, fullName, email, password, role, authorityId });
     await newUser.save();
 
-    res.status(201).json({ 
-      message: "Signup successful. Please login to continue.", 
-      user: { username, fullName, email, role, authorityId } 
+    res.status(201).json({
+      message: "Signup successful. Please login to continue.",
+      user: { username, fullName, email, role, authorityId }
     });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 };
 
-exports.signIn = async (req,res,next)=>{
+exports.signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -477,8 +477,6 @@ exports.signIn = async (req,res,next)=>{
 
     // Find user by email
     const user = await Authority.findOne({ email });
-    console.log("Login attempt for email:", email);
-    console.log("User found:", user ? "Yes" : "No");
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -486,8 +484,7 @@ exports.signIn = async (req,res,next)=>{
 
     // Check password
     const isMatch = await user.comparePassword(password);
-    console.log("Password match result:", isMatch);
-    
+
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -499,15 +496,9 @@ exports.signIn = async (req,res,next)=>{
       { expiresIn: JWT_EXPIRES_IN }
     );
 
-    // Set cookie
-    res.cookie("auth_token", token, {
-      httpOnly: true,
-      secure: NODE_ENV === "production",
-      sameSite: "lax"
-    });
-
     res.json({
       message: "Login successful",
+      token,
       user: {
         username: user.username,
         fullName: user.fullName,
@@ -519,13 +510,13 @@ exports.signIn = async (req,res,next)=>{
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Server error" });
+    next(error);
   }
 }
 
-exports.verify = async (req,res,next)=>{
+exports.verify = async (req, res, next) => {
   try {
-    const user = await Authority.findById(req.authority.id).select('-password');
+    const user = await Authority.findById(req.user.id).select('-password');
 
     if (!user) {
       return res.status(404).json({
@@ -548,23 +539,20 @@ exports.verify = async (req,res,next)=>{
     });
   } catch (error) {
     console.error('Get /me error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    next(error);
   }
 }
 
-exports.logOut = async (req,res,next)=>{
+exports.logOut = async (req, res, next) => {
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict'
   });
-  
-  return res.json({ 
-    success: true, 
-    message: 'Logged out successfully' 
+
+  return res.json({
+    success: true,
+    message: 'Logged out successfully'
   });
 }
 
@@ -595,8 +583,8 @@ exports.getSosCounts = async (req, res, next) => {
       success: true,
       new: newCount,
     });
-  } catch(err) {
-     next(err);
+  } catch (err) {
+    next(err);
   }
 };
 // @desc    Assign an authority unit to an SOS alert
@@ -606,7 +594,7 @@ exports.assignUnitToAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
     // user.id or user._id depending on how it's stored in token. Usually user.id from decoded token.
-    const authorityId = req.user.id || req.user._id; 
+    const authorityId = req.user.id || req.user._id;
 
     const alert = await SOSAlert.findById(id);
 
@@ -616,15 +604,15 @@ exports.assignUnitToAlert = async (req, res, next) => {
 
     // Check if already assigned to this authority
     if (alert.assignedTo && alert.assignedTo.includes(authorityId)) {
-        return res.status(400).json({ success: false, message: "Unit already assigned to this alert" });
+      return res.status(400).json({ success: false, message: "Unit already assigned to this alert" });
     }
 
     // Update alert: Add authority to assignedTo, change status to 'responding' if it was 'new'
     if (!alert.assignedTo) alert.assignedTo = [];
     alert.assignedTo.push(authorityId);
-    
+
     if (alert.status === 'new' || alert.status === 'acknowledged') {
-        alert.status = 'responding';
+      alert.status = 'responding';
     }
 
     await alert.save();

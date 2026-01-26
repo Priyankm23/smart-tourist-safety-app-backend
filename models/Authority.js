@@ -7,7 +7,7 @@ const authoritySchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true }, // hashed
   fullName: { type: String, required: true },
-  policeStationId: { type: String, required: true }, // simple string, can later be ObjectId ref
+  authorityId: { type: String, required: true }, // simple string, can later be ObjectId ref
   role: {
     type: String,
     enum: ["Police Officer", "Tourism Officer", "Emergency Responder", "Admin"],

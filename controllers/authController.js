@@ -9,7 +9,7 @@ const blockchain = require("../services/blockchainService.js");
 
 const { JWT_SECRET, JWT_EXPIRES_IN } = require("../config/config");
 
-exports.registerTourist = async (req, res) => {
+exports.registerTourist = async (req, res, next) => {
   try {
     const {
       name,
@@ -17,13 +17,11 @@ exports.registerTourist = async (req, res) => {
       phone,
       email,
       dayWiseItinerary,
-      tripMembers,
       emergencyContact,
       password,
       language,
       tripEndDate,
       role,
-      preferences,
     } = req.body;
     const { consent } = req.body;
 
@@ -49,14 +47,11 @@ exports.registerTourist = async (req, res) => {
     const phoneEnc = encrypt(phone);
 
     // Only process itinerary if provided (Solo travelers or one-step flow)
-    const dayWiseItineraryEnc =
-      dayWiseItinerary && dayWiseItinerary.length > 0
-        ? encrypt(JSON.stringify(dayWiseItinerary))
-        : []; // Default to empty array for Admins/Members initially
+    // const dayWiseItineraryEnc =
+    //   dayWiseItinerary && dayWiseItinerary.length > 0
+    //     ? encrypt(JSON.stringify(dayWiseItinerary))
+    //     : []; // Default to empty array for Admins/Members initially
 
-    const tripMembersEnc = tripMembers
-      ? encrypt(JSON.stringify(tripMembers))
-      : null;
     const emergencyEnc = encrypt(JSON.stringify(emergencyContact));
 
     // Password hashing
@@ -84,15 +79,14 @@ exports.registerTourist = async (req, res) => {
       govIdHash,
       phoneEncrypted: phoneEnc,
       email,
-      dayWiseItineraryEncrypted: dayWiseItineraryEnc,
-      tripMembersEncrypted: tripMembersEnc,
+      dayWiseItinerary: dayWiseItinerary,
       emergencyContactEncrypted: emergencyEnc,
       passwordHash,
       language: language || "en",
       safetyScore: 100,
 
       // Preferences for Commuters (Safe Pulse / Routes)
-      preferences: preferences || {},
+      // preferences: preferences || {},
 
       consent: {
         tracking: consent?.tracking || false,
@@ -156,14 +150,11 @@ exports.registerTourist = async (req, res) => {
     });
   } catch (err) {
     console.error("registerTourist error", err);
-    if (err.statusCode && err.message) {
-      return res.status(err.statusCode).json({ error: err.message });
-    }
-    return res.status(500).json({ error: "Internal server error" });
+    next(err);
   }
 };
 
-exports.loginTourist = async (req, res) => {
+exports.loginTourist = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -205,6 +196,6 @@ exports.loginTourist = async (req, res) => {
     });
   } catch (err) {
     console.error("loginTourist error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    next(err);
   }
 };

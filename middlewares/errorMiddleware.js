@@ -1,4 +1,6 @@
 // A custom error class can be helpful for defining specific HTTP errors.
+const { NODE_ENV } = require("../config/config");
+
 class CustomError extends Error {
   constructor(statusCode, message) {
     super(message);
@@ -21,7 +23,7 @@ const errorHandler = (err, req, res, next) => {
     error: {
       message: message,
       // In development, you might include the stack, but hide it in production
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+      stack: NODE_ENV === 'development' ? err.stack : undefined,
     },
   });
 };

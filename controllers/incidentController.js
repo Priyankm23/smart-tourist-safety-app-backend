@@ -11,8 +11,8 @@ exports.reportIncident = async (req, res, next) => {
 
         // Basic Validation
         if (!latitude || !longitude) {
-             // If CustomError isn't working for some reason, basic res.status works too, but using project pattern
-             return res.status(400).json({ message: "Please provide latitude (lat), and longitude (lng)." });
+            // If CustomError isn't working for some reason, basic res.status works too, but using project pattern
+            return res.status(400).json({ message: "Please provide latitude (lat), and longitude (lng)." });
         }
 
         // Validate Type if necessary, or let Mongoose handle it

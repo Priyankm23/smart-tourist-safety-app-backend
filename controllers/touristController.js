@@ -7,7 +7,7 @@ const { decrypt } = require("../utils/encrypt.js");
 // @route   GET /api/tourist/profile
 // @access  Private (tourist)
 
-exports.getTouristById = async (req, res) => {
+exports.getTouristById = async (req, res, next) => {
   try {
     console.log("Tourist ID from request:", req.user.touristId);
     const touristId = req.user.touristId;
@@ -63,11 +63,11 @@ exports.getTouristById = async (req, res) => {
 
   } catch (err) {
     console.error("getTouristById error:", err);
-    return res.status(500).json({ error: "Internal server error" });
+    next(err);
   }
 };
 
-exports.getAllTourists = async (req, res) => {
+exports.getAllTourists = async (req, res, next) => {
   try {
     const tourists = await Tourist.find();
 
@@ -92,7 +92,7 @@ exports.getAllTourists = async (req, res) => {
     res.json(safe);
   } catch (err) {
     console.error("❌ getAllTourists error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    next(err);
   }
 };
 

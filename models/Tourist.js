@@ -1,5 +1,6 @@
 // backend/models/Tourist.js
 const mongoose = require("mongoose");
+const { DayAppointSchema } = require("./ItinerarySchemas");
 
 const TouristSchema = new mongoose.Schema({
   touristId: { type: String, required: true, unique: true }, // internal id like T1001
@@ -8,9 +9,6 @@ const TouristSchema = new mongoose.Schema({
   phoneEncrypted: { type: String, required: true }, // AES encrypted
   email: { type: String, required: true, unique: true }, // AES encrypted
 
-  // ==========================================================
-  // 🟢 NEW: END-USER ROLE MANAGEMENT
-  // ==========================================================
   role: {
     type: String,
     enum: ["solo", "tour-admin", "group-member"],
@@ -31,11 +29,11 @@ const TouristSchema = new mongoose.Schema({
   },
 
   // 📝 ITINERARY STORAGE
-  // For 'Solo': Stores personal itinerary (Encrypted JSON consistent with TourGroup format)
+  // For 'Solo': Stores personal itinerary 
   // For 'Group Member': Empty (Inherits from TourGroup)
-  dayWiseItineraryEncrypted: {
-    type: [String],
-    default: [],
+  dayWiseItinerary: {
+    type : [DayAppointSchema],
+    default : []
   },
 
   // Removed 'tripMembersEncrypted' as it is now handled by TourGroup model
@@ -55,7 +53,6 @@ const TouristSchema = new mongoose.Schema({
     regHash: { type: String }, // SHA256 hash that was written to blockchain
     regTxHash: { type: String }, // blockchain tx hash
     eventId: { type: String },
-    itineraryHash: { type: String },
     registeredAtIso: { type: String },
   },
 });

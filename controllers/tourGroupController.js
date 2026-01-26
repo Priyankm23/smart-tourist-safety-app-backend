@@ -1,6 +1,7 @@
 const TourGroup = require("../models/TourGroup");
 const Tourist = require("../models/Tourist");
-const { generateAccessCode } = require("../utils/hash"); // Helper or just Math.random
+const crypto = require('crypto');
+// const { generateAccessCode } = require("../utils/hash"); // Helper or just Math.random
 
 exports.createGroup = async (req, res, next) => {
   try {
@@ -13,8 +14,8 @@ exports.createGroup = async (req, res, next) => {
         .json({ success: false, message: "Missing required group details" });
     }
 
-    // Generate simple 6-char Access Code
-    const accessCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Generate a cryptographically secure 6-char Access Code (3 bytes -> 6 hex chars)
+    const accessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
 
     const newGroup = new TourGroup({
       groupName,
@@ -72,15 +73,8 @@ exports.joinGroup = async (req, res, next) => {
       });
     }
 
-    // Add to Group with default valid coordinates to satisfy 2dsphere index
-    group.members.push({
-      touristId: userId,
-      status: "active",
-      lastKnownLocation: {
-        type: "Point",
-        coordinates: [0, 0],
-      },
-    });
+    // Add to Group. Do NOT insert placeholder coordinates; leave lastKnownLocation undefined until the client reports a real location.
+    group.members.push({ touristId: userId, status: "active" });
     await group.save();
 
     // Update User Profile
@@ -162,12 +156,7 @@ exports.updateGroupItinerary = async (req, res, next) => {
     }
 
     // Determine groupId based on role
-    let groupId = null;
-    if (user.role === "tour-admin") {
-      groupId = user.ownedGroupId;
-    } else {
-      groupId = user.groupId;
-    }
+    let groupId = user.ownedGroupId || user.groupId;
 
     if (!groupId) {
       return res.status(404).json({
@@ -176,22 +165,12 @@ exports.updateGroupItinerary = async (req, res, next) => {
       });
     }
 
-    // Find the group and check if user is a member or admin
+    // Find the group
     const group = await TourGroup.findById(groupId);
     if (!group) {
       return res.status(404).json({
         success: false,
         message: "Group not found.",
-      });
-    }
-
-    // Check if user is admin or a member of the group
-    const isAdmin = group.adminId.toString() === userId;
-    const isMember = group.members.some(m => m.touristId.toString() === userId);
-    if (!isAdmin && !isMember) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to update this group's itinerary.",
       });
     }
 
