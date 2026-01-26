@@ -100,7 +100,7 @@ exports.registerTourist = async (req, res, next) => {
     await tourist.save();
 
     // Blockchain push - Proceed regardless of itinerary presence (Log Identity Creation)
-    const { v4: uuidv4 } = require("uuid");
+    const { v4: uuidv4 } = await import("uuid");
     const eventIdRaw = uuidv4() + "|" + touristId;
     const eventIdHash = sha256Hex(eventIdRaw);
     const eventIdBytes32 = hex64ToBytes32(eventIdHash);
