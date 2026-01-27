@@ -155,6 +155,14 @@ exports.updateGroupItinerary = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
+    // Authorization Check: Only tour-admin can update group itinerary
+    if (user.role !== 'tour-admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only tour administrators can update group itineraries.'
+      });
+    }
+
     // Determine groupId based on role
     let groupId = user.ownedGroupId || user.groupId;
 
@@ -171,6 +179,14 @@ exports.updateGroupItinerary = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Group not found.",
+      });
+    }
+
+    // Verify the user owns this group
+    if (group.adminId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to modify this group.'
       });
     }
 

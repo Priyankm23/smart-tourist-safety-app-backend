@@ -1,5 +1,5 @@
 const express = require("express");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const { verifyToken, isTourAdmin } = require("../middlewares/authMiddleware");
 const {
   createGroup,
   joinGroup,
@@ -12,9 +12,16 @@ const router = express.Router();
 // All routes require authentication
 router.use(verifyToken);
 
-router.post("/create", createGroup);
+// Only tour-admins can create groups
+router.post("/create", isTourAdmin, createGroup);
+
+// Group members can join (no additional role check)
 router.post("/join", joinGroup);
+
+// Both tour-admins and group-members can view dashboard
 router.get("/dashboard", getGroupDashboard);
-router.put("/update", updateGroupItinerary);
+
+// Only tour-admins can update group itinerary (additional check in controller)
+router.put("/update", isTourAdmin, updateGroupItinerary);
 
 module.exports = router;
