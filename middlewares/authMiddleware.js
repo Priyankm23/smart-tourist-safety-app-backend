@@ -22,10 +22,20 @@ function isSolo(req, res, next) {
   res.status(403).json({ message: "Requires solo role" });
 }
 
+// Middleware to ensure only tour-admins can access certain group management routes
+function isTourAdmin(req, res, next) {
+  if (req.user?.role === "tour-admin") {
+    return next();
+  }
+  res.status(403).json({ 
+    message: "Access denied. Only tour administrators can perform this action." 
+  });
+}
+
 function isAuthority(req, res, next) {
   const allowedRoles = ["Police Officer", "Tourism Officer", "Emergency Responder", "Admin", "authority"];
   if (allowedRoles.includes(req.user?.role)) return next();
   res.status(403).json({ message: "Requires Authority role" });
 }
 
-module.exports = { verifyToken, isSolo, isAuthority };
+module.exports = { verifyToken, isSolo, isTourAdmin, isAuthority };
