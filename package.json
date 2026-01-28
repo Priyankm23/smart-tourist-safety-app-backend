@@ -4,7 +4,7 @@
   "main": "app.js",
   "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "mocha \"tests/**/*.test.js\" --exit",
     "dev": "nodemon app.js",
     "start": "node app.js"
   },
@@ -28,8 +28,12 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "resend": "^6.8.0",
     "socket.io": "^4.8.1",
     "uuid": "^13.0.0",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "mocha": "^10.2.0"
   }
 }

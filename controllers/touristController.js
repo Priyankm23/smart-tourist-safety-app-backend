@@ -47,6 +47,8 @@ exports.getTouristById = async (req, res, next) => {
       name: tourist.nameEncrypted ? decrypt(tourist.nameEncrypted) : null,
       phone: tourist.phoneEncrypted ? decrypt(tourist.phoneEncrypted) : null,
       email: tourist.email,
+      role: tourist.role, // IMPORTANT: Include role for frontend authorization
+      groupId: tourist.groupId || null, // Include groupId for group members
       dayWiseItinerary: decryptedItinerary, // updated field name
       emergencyContact: tourist.emergencyContactEncrypted
         ? JSON.parse(decrypt(tourist.emergencyContactEncrypted))

@@ -7,6 +7,7 @@ const connectDB = require("./config/dbConnection");
 const authRoutes = require("./routes/authRoutes");
 const touristRoutes = require("./routes/touristRoutes");
 const tourGroupRoutes = require("./routes/tourGroupRoutes");
+const groupMemberRoutes = require("./routes/groupMemberRoutes");
 const authorityRoutes = require("./routes/authorityRoutes");
 const sosRoutes = require("./routes/sosRoutes");
 const incidentRoutes = require("./routes/incidentRoutes");
@@ -60,6 +61,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/tourist", touristRoutes);
 app.use("/api/group", tourGroupRoutes);
+app.use("/api/group/members", groupMemberRoutes);
 app.use("/api/authority", authorityRoutes);
 app.use("/api/geofence", geofenceRoutes);
 app.use("/api/sos", sosRoutes);
