@@ -168,6 +168,14 @@ exports.loginTourist = async (req, res, next) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // ⚠️ Block group members from email/password login - they must use 3-code login
+    if (tourist.role === "group-member") {
+      return res.status(403).json({ 
+        error: "Group members must login using the 3-code system. Please use 'Group Member? Login with Codes' option.",
+        code: "GROUP_MEMBER_USE_CODES"
+      });
+    }
+
     // Verify password
     const passwordMatch = await bcrypt.compare(password, tourist.passwordHash);
     if (!passwordMatch) {
@@ -199,3 +207,101 @@ exports.loginTourist = async (req, res, next) => {
     next(err);
   }
 };
+
+// POST /api/auth/login-with-codes - Login for group members using 3 codes
+exports.loginWithCodes = async (req, res, next) => {
+  try {
+    const { guideId, touristId, groupAccessCode } = req.body;
+
+    // 1. Validate all three codes are provided
+    if (!guideId || !touristId || !groupAccessCode) {
+      return res.status(400).json({
+        success: false,
+        error: "All three codes are required: Guide ID, Tourist ID, and Group Access Code",
+      });
+    }
+
+    // 2. Find the tourist (group member) by touristId
+    const tourist = await Tourist.findOne({ touristId: touristId }).populate('groupId');
+    if (!tourist) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid credentials. Please check your codes and try again.",
+      });
+    }
+
+    // 3. Verify tourist is a group member
+    if (tourist.role !== "group-member") {
+      return res.status(403).json({
+        success: false,
+        error: "This login method is only for group members. Please use email/password login.",
+      });
+    }
+
+    // 4. Verify tourist belongs to a group
+    if (!tourist.groupId) {
+      return res.status(401).json({
+        success: false,
+        error: "You are not assigned to any group. Please contact your tour guide.",
+      });
+    }
+
+    // 5. Get the group to verify access code
+    const TourGroup = require("../models/TourGroup");
+    const group = await TourGroup.findById(tourist.groupId).populate('adminId');
+    
+    if (!group) {
+      return res.status(401).json({
+        success: false,
+        error: "Group not found. Please contact your tour guide.",
+      });
+    }
+
+    // 6. Verify group access code matches
+    if (group.accessCode !== groupAccessCode) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid credentials. Please check your codes and try again.",
+      });
+    }
+
+    // 7. Verify guide ID matches the group admin
+    const admin = group.adminId;
+    if (!admin || admin.touristId !== guideId) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid credentials. Please check your codes and try again.",
+      });
+    }
+
+    // 8. All validations passed - Generate JWT
+    const payload = {
+      id: tourist._id,
+      touristId: tourist.touristId,
+      role: tourist.role,
+      language: tourist.language,
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: JWT_EXPIRES_IN,
+    });
+
+    // 9. Return success response
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        touristId: tourist.touristId,
+        name: decrypt(tourist.nameEncrypted),
+        role: tourist.role,
+        groupId: tourist.groupId ? tourist.groupId.toString() : null,
+        groupName: group.groupName,
+        token,
+      },
+    });
+  } catch (err) {
+    console.error("loginWithCodes error:", err);
+    next(err);
+  }
+};
+

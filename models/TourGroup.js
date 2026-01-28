@@ -31,12 +31,7 @@ const TourGroupSchema = new mongoose.Schema({
         type: String,
         enum: ["active", "inactive", "SOS"],
         default: "active",
-      },
-      lastKnownLocation: {
-        type: { type: String, default: "Point" },
-        // coordinates are optional. do not default to [0,0] which is a valid but meaningless location.
-        coordinates: { type: [Number] },
-      },
+      },  
     },
   ],
 

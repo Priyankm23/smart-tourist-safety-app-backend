@@ -38,10 +38,27 @@ const TouristSchema = new mongoose.Schema({
 
   // Removed 'tripMembersEncrypted' as it is now handled by TourGroup model
 
+  // Personal Information Fields (Added for People Management)
+  dob: { type: Date }, // Date of Birth
+  nationality: { type: String }, // Nationality
+  gender: { 
+    type: String, 
+    enum: ["Male", "Female", "Other"] 
+  }, // Gender
+
+  // Medical Information Fields
+  bloodGroup: { 
+    type: String,
+    enum: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
+  }, // Blood Group
+  medicalConditions: { type: String }, // Medical Conditions (plain text for now)
+  allergies: { type: String }, // Allergies information
+
   emergencyContactEncrypted: { type: String }, // AES encrypted
   passwordHash: { type: String, required: true }, // bcrypt hashed password
   language: { type: String, default: "en" },
   safetyScore: { type: Number, default: 80 }, // initial tourist safety score
+  welcomeEmailSent: { type: Boolean, default: false }, // Track if welcome email was sent
   consent: {
     tracking: { type: Boolean, default: false },
     dataRetention: { type: Boolean, default: true },
