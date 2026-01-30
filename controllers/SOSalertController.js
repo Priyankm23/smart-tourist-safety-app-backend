@@ -1,4 +1,4 @@
-const SOSAlert = require("../models/SOSAlert.js");
+const SOSAlert = require("../models/SOSAlertModel.js");
 const { ethers } = require("ethers");
 const { updateRiskScores } = require('../services/riskEngineService'); // Import Risk Engine
 const { hex64ToBytes32 } = require('../utils/ethFormat.js');
