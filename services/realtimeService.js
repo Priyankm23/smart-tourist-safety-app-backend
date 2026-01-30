@@ -12,8 +12,9 @@ let authoritySockets = new Map(); // Map to store connected authorities
 exports.init = (httpServer) => {
   io = socketio(httpServer, {
     cors: {
-      origin: "http://localhost:5173", // Adjust for specific origins in production
-      methods: ["GET", "POST"]
+      origin: true, // Allow all origins dynamically for production
+      methods: ["GET", "POST"],
+      credentials: true
     }
   });
 
