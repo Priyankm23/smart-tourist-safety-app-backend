@@ -1,6 +1,6 @@
 // models/Authority.js
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 const authoritySchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, trim: true },

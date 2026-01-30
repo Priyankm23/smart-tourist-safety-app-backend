@@ -1,6 +1,6 @@
 const RiskGrid = require('../models/RiskGrid');
 const Incident = require('../models/Incident');
-const SOSAlert = require('../models/SOSalert');
+const SOSAlert = require('../models/SOSAlert');
 const { getGridName } = require('../utils/mapboxClient');
 
 // Constants

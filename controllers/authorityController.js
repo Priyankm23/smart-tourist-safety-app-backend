@@ -1,4 +1,4 @@
-const SOSAlert = require('../models/SOSalert');
+const SOSAlert = require('../models/SOSAlert');
 const DangerZone = require("../models/Geofence");
 const { CustomError } = require('../middlewares/errorMiddleware');
 const Tourist = require('../models/Tourist');
