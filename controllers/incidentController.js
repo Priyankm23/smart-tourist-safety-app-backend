@@ -39,6 +39,20 @@ exports.reportIncident = async (req, res, next) => {
         // Trigger Real-time Risk Update
         updateRiskScores().catch(err => console.error("Risk update failed:", err));
 
+        // Emit real-time incident
+        const realtimeService = require('../services/realtimeService');
+        realtimeService.emitIncidentReported({
+            id: savedIncident._id,
+            title: savedIncident.title,
+            type: savedIncident.type,
+            severity: savedIncident.severity >= 0.8 ? 'critical' : (savedIncident.severity >= 0.6 ? 'high' : 'medium'),
+            location: {
+                lat: savedIncident.location.coordinates[1],
+                lng: savedIncident.location.coordinates[0]
+            },
+            timestamp: savedIncident.timestamp
+        }).catch(err => console.error("Socket emit error:", err));
+
         res.status(201).json({
             success: true,
             message: "Incident reported successfully.",

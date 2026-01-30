@@ -16,6 +16,7 @@ const itineraryRoutes = require("./routes/itineraryRoutes");
 const { errorHandler } = require("./middlewares/errorMiddleware");
 const { updateRiskScores } = require("./services/riskEngineService");
 // const { fetchNewsIncidents } = require('./services/newsService'); // News service disabled
+const { init } = require('./services/realtimeService');
 
 const app = express();
 const server = http.createServer(app);
@@ -80,6 +81,9 @@ const startServer = async () => {
     // 2. Start Request Listening
     server.listen(PORT, () => {
       console.log(`Server running in ${NODE_ENV} mode on port ${PORT}`);
+
+      // Initialize WebSocket service (attach to HTTP server)
+      init(server);
 
       // Start Background Services
       console.log("Starting Risk Engine...");

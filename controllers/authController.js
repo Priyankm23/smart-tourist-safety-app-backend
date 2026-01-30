@@ -22,6 +22,13 @@ exports.registerTourist = async (req, res, next) => {
       language,
       tripEndDate,
       role,
+      // New fields
+      dob,
+      nationality,
+      gender,
+      bloodGroup,
+      medicalConditions,
+      allergies,
     } = req.body;
     const { consent } = req.body;
 
@@ -83,7 +90,14 @@ exports.registerTourist = async (req, res, next) => {
       emergencyContactEncrypted: emergencyEnc,
       passwordHash,
       language: language || "en",
-      safetyScore: 100,
+
+      // Personal & Medical Info
+      dob,
+      nationality,
+      gender,
+      bloodGroup,
+      medicalConditions,
+      allergies,
 
       // Preferences for Commuters (Safe Pulse / Routes)
       // preferences: preferences || {},

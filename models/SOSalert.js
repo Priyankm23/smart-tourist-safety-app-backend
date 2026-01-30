@@ -56,7 +56,19 @@ const sosAlertSchema = new mongoose.Schema(
     payloadHashOnChain: { type: String }, // hash of the payload stored on-chain
 
     // Authorities assigned to handle the SOS
-    assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: "Authority" }],
+    // Store authority identifier and display name (gov id, full name, role)
+    assignedTo: [{
+      authorityId: { type: String },
+      fullName: { type: String },
+      role: { type: String }
+    }],
+
+    // Response time formatted string (e.g., "00:57:54") sent by frontend
+    responseTime: { type: String },
+
+    // Auditable timestamps
+    responseDate: { type: Date }, // Time when authority was assigned
+    resolvedDate: { type: Date }, // Time when alert was marked resolved
 
     // Additional metadata
     metadata: { type: Object },

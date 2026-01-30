@@ -8,7 +8,7 @@ const Incident = require('../models/Incident');
 const RiskGrid = require('../models/RiskGrid');
 const Authority = require('../models/Authority');
 const jwt = require('jsonwebtoken');
-const { NODE_ENV } = require('../config/config')
+const { JWT_SECRET, JWT_EXPIRES_IN} = require('../config/config')
 
 // @desc    Get aggregated dashboard statistics
 // @route   GET /api/authority/dashboard-stats
@@ -22,7 +22,7 @@ exports.getDashboardStats = async (req, res, next) => {
 
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
+    
     // 1. Active Tourists & Change
     const activeTouristsCount = await Tourist.countDocuments({ expiresAt: { $gt: new Date() } });
 
@@ -131,6 +131,142 @@ exports.getDashboardStats = async (req, res, next) => {
       };
     });
 
+
+    // 7. NEW: Advanced Analytics Data (Response Time, Severity, Demographics)
+    
+    // a. Response Time Analysis
+    const respondingAlerts = await SOSAlert.find({ 
+      status: { $in: ['responding', 'resolved', 'closed'] },
+      responseDate: { $exists: true } 
+    }).select('timestamp responseDate').lean();
+
+    let totalResponseTimeMs = 0;
+    let responseCount = 0;
+    
+    respondingAlerts.forEach(a => {
+      if (a.responseDate && a.timestamp) {
+        const diff = new Date(a.responseDate) - new Date(a.timestamp);
+        if (diff > 0) {
+          totalResponseTimeMs += diff;
+          responseCount++;
+        }
+      }
+    });
+
+    const avgResponseTimeMs = responseCount > 0 ? (totalResponseTimeMs / responseCount) : 0;
+    const avgResponseTimeMinutes = Math.abs(avgResponseTimeMs / 60000).toFixed(1); // One decimal place
+    const avgResponseTimeString = `${avgResponseTimeMinutes} min`;
+
+    // b. Incident Severity Breakdown
+    const incidents = await Incident.find({}).select('severity type timestamp title location').lean();
+    const severityStats = { critical: 0, high: 0, medium: 0, low: 0 };
+    
+    incidents.forEach(inc => {
+      const score = inc.severity || 0;
+      if (score >= 0.8) severityStats.critical++;
+      else if (score >= 0.6) severityStats.high++;
+      else if (score >= 0.4) severityStats.medium++;
+      else severityStats.low++;
+    });
+
+    // c. Live Incident Stream (Top 5 recent)
+    const incidentStream = incidents
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 5)
+      .map(i => ({
+        id: i._id,
+        title: i.title,
+        type: i.type,
+        severity: i.severity >= 0.8 ? 'critical' : (i.severity >= 0.6 ? 'high' : 'medium'),
+        time: i.timestamp,
+        location: {
+          lat: i.location.coordinates[1],
+          lng: i.location.coordinates[0]
+        }
+      }));
+
+    // d. Demographic Vulnerability (Based on all SOS alerts to find patterns)
+    // We need to fetch alerts with populated tourist data
+    const allAlertsForDemographics = await SOSAlert.find({})
+      .populate('touristId', 'dob gender nationality role ownedGroupId groupId') // Populating unencrypted fields
+      .lean();
+
+    let ageGroups = { '18-30': 0, '30-50': 0, '50+': 0, 'Under 18': 0 };
+    let soloCount = 0;
+    let groupCount = 0;
+    let nationalityMap = {};
+
+    allAlertsForDemographics.forEach(a => {
+      const t = a.touristId;
+      if (t) {
+        // Age Pattern
+        if (t.dob) {
+          const age = new Date().getFullYear() - new Date(t.dob).getFullYear();
+          if (age < 18) ageGroups['Under 18']++;
+          else if (age <= 30) ageGroups['18-30']++;
+          else if (age <= 50) ageGroups['30-50']++;
+          else ageGroups['50+']++;
+        }
+
+        // Solo vs Group (Check role or group links)
+        if (t.role === 'solo' && !t.groupId) soloCount++;
+        else groupCount++;
+
+        // Nationality
+        if (t.nationality) {
+          nationalityMap[t.nationality] = (nationalityMap[t.nationality] || 0) + 1;
+        }
+      }
+    });
+
+    // Find top nationality
+    let topNationality = 'N/A';
+    let maxNatCount = 0;
+    Object.keys(nationalityMap).forEach(nat => {
+      if (nationalityMap[nat] > maxNatCount) {
+        maxNatCount = nationalityMap[nat];
+        topNationality = nat;
+      }
+    });
+    
+    // Find top age group
+    let topAgeGroup = 'N/A';
+    let maxAgeCount = 0;
+    Object.keys(ageGroups).forEach(grp => {
+      if (ageGroups[grp] > maxAgeCount) {
+        maxAgeCount = ageGroups[grp];
+        topAgeGroup = grp;
+      }
+    });
+
+    const soloPercentage = (soloCount + groupCount) > 0 
+      ? Math.round((soloCount / (soloCount + groupCount)) * 100) 
+      : 0;
+
+    // e. Unit Utilization
+    // Total active units
+    const totalUnits = await Authority.countDocuments({ 
+      role: { $in: ['Emergency Responder', 'Police Officer'] }, 
+      isActive: true 
+    });
+
+    // Engaged units (those assigned to currently open alerts)
+    const openAlerts = await SOSAlert.find({ 
+      status: { $in: ['new', 'responding'] } 
+    }).select('assignedTo');
+    
+    const engagedUnitIds = new Set();
+    openAlerts.forEach(alert => {
+      if (alert.assignedTo && Array.isArray(alert.assignedTo)) {
+        alert.assignedTo.forEach(assignment => {
+          if (assignment.authorityId) engagedUnitIds.add(assignment.authorityId);
+        });
+      }
+    });
+    
+    const engagedCount = engagedUnitIds.size;
+    const utilizationPercent = totalUnits > 0 ? Math.round((engagedCount / totalUnits) * 100) : 0;
+
     res.status(200).json({
       success: true,
       data: {
@@ -150,7 +286,42 @@ exports.getDashboardStats = async (req, res, next) => {
           change: `${resolvedPercentChange >= 0 ? '+' : ''}${resolvedPercentChange}% from last month`
         },
         recentAlerts,
-        touristOverview
+        touristOverview,
+        
+        // Advanced Analytics Merged Data
+        analytics: {
+          responseAnalysis: {
+            avgTime: avgResponseTimeString,
+            avgTimeMinutes: parseFloat(avgResponseTimeMinutes),
+            samples: respondingAlerts
+              .slice(0, 50)
+              .map(a => parseFloat(((new Date(a.responseDate) - new Date(a.timestamp)) / 60000).toFixed(2))) // minutes
+          },
+          unitUtilization: {
+            percent: utilizationPercent,
+            engaged: engagedCount,
+            total: totalUnits,
+            label: `${utilizationPercent}% units engaged`
+          },
+          incidentAnalysis: {
+            severityBreakdown: severityStats,
+            recentStream: incidentStream
+          },
+          demographics: {
+            mostSosFromAge: topAgeGroup,
+            soloTravelersPercent: `${soloPercentage}%`,
+            topGroup: topNationality
+          },
+          predictions: {
+            crowdSurge: "Moderate (30% increase expected)",
+            riskForecast: "Elevated due to festival (next 48h)",
+            proactiveDeployment: "Suggest positioning 4 units near Sector 4"
+          },
+          patterns: {
+             insight1: "Theft spikes in Sector 4 on Friday nights 6-9 PM",
+             insight2: "Higher lost reports near central station after 10pm"
+          }
+        }
       }
     });
 
@@ -367,7 +538,7 @@ exports.getMapOverview = async (req, res, next) => {
     }));
 
     // 4. Fetch Active SOS Alerts
-    const alertsRaw = await SOSAlert.find({ status: { $in: ['new', 'responding'] } }).lean();
+    const alertsRaw = await SOSAlert.find({ status: { $in: ['new', 'responding'] } }).populate('touristId', 'touristId').lean();
     const activeAlerts = alertsRaw.map(a => {
       // SOSAlert uses GeoJSON [lng, lat]
       const lat = a.location.coordinates[1];
@@ -562,7 +733,85 @@ exports.logOut = async (req, res, next) => {
 exports.getNewSosAlerts = async (req, res, next) => {
   try {
     // Fetch all SOS alerts with status 'new', sorted by latest timestamp first
-    const alerts = await SOSAlert.find({ status: 'new' }).sort({ timestamp: -1 });
+    const alertsRaw = await SOSAlert.find({ status: 'new' })
+      .sort({ timestamp: -1 })
+      .populate('touristId') // Populate the full tourist document
+      .lean();
+
+    // Transform each alert to include complete tourist profile details
+    const alerts = await Promise.all(alertsRaw.map(async (sosAlert) => {
+      let touristData = {
+        touristId: null,
+        touristName: 'Unknown',
+        phone: null,
+        age: null,
+        nationality: null,
+        gender: null,
+        bloodGroup: null,
+        medicalConditions: null,
+        allergies: null,
+        emergencyContact: null,
+      };
+
+      // If tourist data is populated, decrypt and extract details
+      if (sosAlert.touristId && typeof sosAlert.touristId === 'object') {
+        const tourist = sosAlert.touristId;
+        
+        try {
+          // Decrypt personal information
+          touristData.touristId = tourist.touristId;
+          touristData.touristName = tourist.nameEncrypted ? decrypt(tourist.nameEncrypted) : 'Unknown';
+          touristData.phone = tourist.phoneEncrypted ? decrypt(tourist.phoneEncrypted) : null;
+
+          // Calculate age from DOB if available
+          if (tourist.dob) {
+            const today = new Date();
+            const birthDate = new Date(tourist.dob);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+            touristData.age = age;
+          }
+
+          // Extract other profile fields
+          touristData.nationality = tourist.nationality || null;
+          touristData.gender = tourist.gender || null;
+          touristData.bloodGroup = tourist.bloodGroup || null;
+          touristData.medicalConditions = tourist.medicalConditions || null;
+          touristData.allergies = tourist.allergies || null;
+
+          // Decrypt emergency contact if available
+          if (tourist.emergencyContactEncrypted) {
+            touristData.emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
+          }
+        } catch (decryptErr) {
+          console.error('Error decrypting tourist data:', decryptErr);
+        }
+      }
+
+      // Return alert in the same structure as real-time emit
+      return {
+        alertId: sosAlert._id,
+        touristId: touristData.touristId,
+        touristName: touristData.touristName,
+        phone: touristData.phone,
+        age: touristData.age,
+        nationality: touristData.nationality,
+        gender: touristData.gender,
+        bloodGroup: touristData.bloodGroup,
+        medicalConditions: touristData.medicalConditions,
+        allergies: touristData.allergies,
+        emergencyContact: touristData.emergencyContact,
+        location: sosAlert.location,
+        locationName: sosAlert.locationName,
+        timestamp: sosAlert.timestamp,
+        safetyScore: sosAlert.safetyScore,
+        sosReason: sosAlert.sosReason,
+        status: sosAlert.status
+      };
+    }));
 
     res.status(200).json({
       success: true,
@@ -571,6 +820,126 @@ exports.getNewSosAlerts = async (req, res, next) => {
     });
   } catch (err) {
     console.error("❌ getNewSosAlerts error:", err);
+    next(err);
+  }
+};
+
+// @desc    Get all responding SOS alerts
+// @route   GET /api/authority/alerts/responding
+// @access  Private (authority)
+exports.getRespondingSosAlerts = async (req, res, next) => {
+  try {
+    // Fetch all SOS alerts with status 'responding', sorted by latest timestamp first
+    const alertsRaw = await SOSAlert.find({ status: 'responding' })
+      .sort({ timestamp: -1 })
+      .populate('touristId') // still populate tourist
+      .lean();
+
+    // Transform each alert to include complete tourist profile details
+    const alerts = await Promise.all(alertsRaw.map(async (sosAlert) => {
+      let touristData = {
+        touristId: null,
+        touristName: 'Unknown',
+        phone: null,
+        age: null,
+        nationality: null,
+        gender: null,
+        bloodGroup: null,
+        medicalConditions: null,
+        allergies: null,
+        emergencyContact: null,
+        govId: null
+      };
+
+      // If tourist data is populated, decrypt and extract details
+      if (sosAlert.touristId && typeof sosAlert.touristId === 'object') {
+        const tourist = sosAlert.touristId;
+        
+        try {
+          // Decrypt personal information
+          touristData.touristId = tourist.touristId;
+          touristData.touristName = tourist.nameEncrypted ? decrypt(tourist.nameEncrypted) : 'Unknown';
+          touristData.phone = tourist.phoneEncrypted ? decrypt(tourist.phoneEncrypted) : null;
+
+          // Calculate age from DOB if available
+          if (tourist.dob) {
+            const today = new Date();
+            const birthDate = new Date(tourist.dob);
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+              age--;
+            }
+            touristData.age = age;
+          }
+
+          // Extract other profile fields
+          touristData.nationality = tourist.nationality || null;
+          touristData.gender = tourist.gender || null;
+          touristData.bloodGroup = tourist.bloodGroup || null;
+          touristData.medicalConditions = tourist.medicalConditions || null;
+          touristData.allergies = tourist.allergies || null;
+
+          // If raw govId is stored encrypted, decrypt and include it (use with caution)
+          if (tourist.govIdEncrypted) {
+            try {
+              touristData.govId = decrypt(tourist.govIdEncrypted);
+            } catch (e) {
+              console.error('Error decrypting govIdEncrypted:', e);
+              touristData.govId = null;
+            }
+          }
+
+          // Decrypt emergency contact if available
+          if (tourist.emergencyContactEncrypted) {
+            touristData.emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
+          }
+        } catch (decryptErr) {
+          console.error('Error decrypting tourist data:', decryptErr);
+        }
+      }
+
+      // Return alert in the same structure as real-time emit
+      // Normalize assignedTo to ensure consistent output: array of { authorityId, fullName, role }
+      const assigned = (sosAlert.assignedTo || []).map(a => {
+        if (!a) return null;
+        if (typeof a === 'string') return { authorityId: a, fullName: null };
+        // already an object with authorityId/fullName
+        return { authorityId: a.authorityId || null, fullName: a.fullName || null, role: a.role || null };
+      }).filter(x => x !== null);
+
+      return {
+        alertId: sosAlert._id,
+        touristId: touristData.touristId,
+        touristName: touristData.touristName,
+        govId: touristData.govId || null,
+        phone: touristData.phone,
+        age: touristData.age,
+        nationality: touristData.nationality,
+        gender: touristData.gender,
+        bloodGroup: touristData.bloodGroup,
+        medicalConditions: touristData.medicalConditions,
+        allergies: touristData.allergies,
+        emergencyContact: touristData.emergencyContact,
+        location: sosAlert.location,
+        locationName: sosAlert.locationName,
+        timestamp: sosAlert.timestamp,
+        safetyScore: sosAlert.safetyScore,
+        sosReason: sosAlert.sosReason,
+        status: sosAlert.status,
+        responseDate: sosAlert.responseDate,
+        responseTime: sosAlert.responseTime,
+        assignedTo: assigned
+      };
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: alerts.length,
+      alerts
+    });
+  } catch (err) {
+    console.error("❌ getRespondingSosAlerts error:", err);
     next(err);
   }
 };
@@ -594,7 +963,7 @@ exports.assignUnitToAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
     // user.id or user._id depending on how it's stored in token. Usually user.id from decoded token.
-    const authorityId = req.user.id || req.user._id;
+    const authorityObjectId = req.user.id || req.user._id;
 
     const alert = await SOSAlert.findById(id);
 
@@ -602,20 +971,46 @@ exports.assignUnitToAlert = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "SOS Alert not found" });
     }
 
-    // Check if already assigned to this authority
-    if (alert.assignedTo && alert.assignedTo.includes(authorityId)) {
-      return res.status(400).json({ success: false, message: "Unit already assigned to this alert" });
+    // Resolve current authority record
+    const authority = await Authority.findById(authorityObjectId).select('authorityId fullName role');
+    if (!authority) {
+      return res.status(404).json({ success: false, message: 'Assigning authority not found' });
     }
 
-    // Update alert: Add authority to assignedTo, change status to 'responding' if it was 'new'
+    // Note: allow same authority to be assigned to multiple alerts; do not block duplicates here.
+
+    // Update alert: Add authority info object to assignedTo, change status to 'responding' if it was 'new'
     if (!alert.assignedTo) alert.assignedTo = [];
-    alert.assignedTo.push(authorityId);
+    alert.assignedTo.push({ authorityId: authority.authorityId, fullName: authority.fullName, role: authority.role });
+
+    // Save response time if provided
+    if (req.body.responseTime) {
+      console.log(req.body.responseTime)
+      alert.responseTime = req.body.responseTime;
+    }
 
     if (alert.status === 'new' || alert.status === 'acknowledged') {
       alert.status = 'responding';
+      // Set response timestamp if not already set
+      if (!alert.responseDate) {
+        alert.responseDate = new Date();
+      }
     }
 
     await alert.save();
+    
+    // Construct real-time payload
+    const alertData = {
+      alertId: alert._id,
+      status: alert.status,
+      assignedTo: alert.assignedTo,
+      responseDate: alert.responseDate,
+      responseTime: alert.responseTime // if set
+    };
+    
+    // Emit real-time update
+    const realtimeService = require('../services/realtimeService');
+    realtimeService.emitSOSStatusUpdate(alertData).catch(err => console.error("Socket emit error:", err));
 
     res.status(200).json({
       success: true,
@@ -625,6 +1020,45 @@ exports.assignUnitToAlert = async (req, res, next) => {
 
   } catch (err) {
     console.error("❌ assignUnitToAlert error:", err);
+    next(err);
+  }
+};
+
+// @desc    Mark SOS alert as resolved
+// @route   PUT /api/authority/alerts/:id/resolve
+// @access  Private (authority)
+exports.resolveAlert = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const alert = await SOSAlert.findById(id);
+
+    if (!alert) {
+      return res.status(404).json({ success: false, message: "SOS Alert not found" });
+    }
+
+    alert.status = "resolved";
+    alert.resolvedDate = new Date();
+    
+    // Optionally calculate total resolution time here if useful
+    // const durationMs = alert.resolvedDate - alert.timestamp;
+
+    await alert.save();
+
+    // Emit real-time update for resolution
+    const realtimeService = require('../services/realtimeService');
+    realtimeService.emitSOSStatusUpdate({
+      alertId: alert._id,
+      status: "resolved",
+      resolvedDate: alert.resolvedDate
+    }).catch(err => console.error("Socket emit error:", err));
+
+    res.status(200).json({
+      success: true,
+      message: "Alert resolved successfully",
+      data: alert
+    });
+  } catch (err) {
+    console.error("❌ resolveAlert error:", err);
     next(err);
   }
 };

@@ -56,8 +56,8 @@ const TouristSchema = new mongoose.Schema({
 
   emergencyContactEncrypted: { type: String }, // AES encrypted
   passwordHash: { type: String, required: true }, // bcrypt hashed password
-  language: { type: String, default: "en" },
-  safetyScore: { type: Number, default: 80 }, // initial tourist safety score
+  language: { type: String, default: "hindi" },
+  safetyScore: { type: Number, default: 70 }, // initial tourist safety score
   welcomeEmailSent: { type: Boolean, default: false }, // Track if welcome email was sent
   consent: {
     tracking: { type: Boolean, default: false },

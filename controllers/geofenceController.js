@@ -72,6 +72,19 @@ exports.createGeoFenceToDangerLocation = async (req, res, next) => {
   try {
     const dangerZone = new DangerZone(req.body);
     await dangerZone.save();
+    
+    // Emit real-time zone update
+    const realtimeService = require('../services/realtimeService');
+    realtimeService.emitDangerZoneAdded({
+      id: dangerZone.id || dangerZone._id,
+      name: dangerZone.name,
+      riskLevel: dangerZone.riskLevel,
+      type: 'zone',
+      shape: dangerZone.type,
+      coordinates: dangerZone.coords,
+      radius: dangerZone.radiusKm ? dangerZone.radiusKm * 1000 : 0
+    }).catch(err => console.error("Socket emit error:", err));
+
     res.status(201).json({ message: "Danger zone saved successfully", data: dangerZone });
   } catch (error) {
     console.error("Error saving danger zone:", error);

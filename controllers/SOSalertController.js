@@ -6,6 +6,7 @@ const { sha256Hex } = require("../utils/hash.js"); // your existing hash utility
 const { POLYGON_RPC, PRIVATE_KEY, SMART_CONTRACT_ADDRESS_sos } = require("../config/config.js");
 const Tourist = require('../models/Tourist.js');
 const { decrypt } = require('../utils/encrypt.js');
+const realtimeService = require('../services/realtimeService');
 const SOSABI = [
 	{
 		"anonymous": false,
@@ -129,19 +130,40 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
 exports.triggerSOS = async (req, res, next) => {
 	try {
 		const { location, safetyScore, locationName, sosReason } = req.body;
-		const touristId = req.user.touristId;
+		const touristId = req.user && req.user.touristId;
+
+		// Basic validation (ensure touristId and location coordinates present)
+		if (!touristId || !location || !Array.isArray(location.coordinates) || location.coordinates.length < 2) {
+			return res.status(400).json({ error: 'Missing required SOS fields: touristId and location.coordinates [lng, lat]' });
+		}
 
 		// 1️⃣ Get tourist details
 		const tourist = await Tourist.findOne({ touristId });
 		if (!tourist) return res.status(404).json({ error: "Tourist not found" });
 
-		// 2️⃣ Decrypt emergency contact
+		// 2️⃣ Decrypt tourist personal information
+		const name = decrypt(tourist.nameEncrypted);
+		const phone = tourist.phoneEncrypted ? decrypt(tourist.phoneEncrypted) : null;
+
+		// Calculate age from DOB if available
+		let age = null;
+		if (tourist.dob) {
+			const today = new Date();
+			const birthDate = new Date(tourist.dob);
+			age = today.getFullYear() - birthDate.getFullYear();
+			const monthDiff = today.getMonth() - birthDate.getMonth();
+			if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+				age--;
+			}
+		}
+
+		// 3️⃣ Decrypt emergency contact
 		let emergencyContact = null;
 		if (tourist.emergencyContactEncrypted) {
 			emergencyContact = JSON.parse(decrypt(tourist.emergencyContactEncrypted));
 		}
 
-		// 3️⃣ Save SOS in MongoDB immediately
+		// 4️⃣ Save SOS in MongoDB immediately
 		const sosAlert = new SOSAlert({
 			touristId: tourist._id,
 			location,
@@ -167,6 +189,37 @@ exports.triggerSOS = async (req, res, next) => {
 				timestamp: sosAlert.timestamp,
 			},
 		});
+
+		// 6️⃣ AFTER response: emit real-time SOS to connected authorities (fire-and-forget)
+		(async () => {
+			try {
+				const alertData = {
+					alertId: sosAlert._id,
+					touristId: touristId,
+					touristName: name,
+					phone: phone,
+					age: age,
+					nationality: tourist.nationality || null,
+					gender: tourist.gender || null,
+					bloodGroup: tourist.bloodGroup || null,
+					medicalConditions: tourist.medicalConditions || null,
+					allergies: tourist.allergies || null,
+					emergencyContact: emergencyContact,
+					location: sosAlert.location,
+					locationName: sosAlert.locationName,
+					timestamp: sosAlert.timestamp || new Date().toISOString(),
+					safetyScore: sosAlert.safetyScore,
+					sosReason: sosAlert.sosReason,
+					status: sosAlert.status
+				};
+
+				realtimeService.emitSOSAlert(alertData).catch(err => {
+					console.error('emitSOSAlert failed (non-blocking):', err);
+				});
+			} catch (err) {
+				console.error('Realtime emit wrapper error:', err);
+			}
+		})();
 
 		// 6️⃣ AFTER response: Sequentially log alerts on blockchain
 		(async () => {

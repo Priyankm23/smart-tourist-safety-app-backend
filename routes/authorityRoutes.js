@@ -1,13 +1,15 @@
 const express = require('express');
 const {
   getNewSosAlerts,
+  getRespondingSosAlerts,
   getSosCounts,
   getDashboardStats,
   getTouristManagementData,
   revokeTourist,
   getMapOverview,
   signUp, signIn, verify, logOut,
-  assignUnitToAlert
+  assignUnitToAlert,
+  resolveAlert
 } = require('../controllers/authorityController');
 const { verifyToken, isAuthority } = require('../middlewares/authMiddleware');
 
@@ -19,7 +21,9 @@ router.get('/tourist-management', verifyToken, isAuthority, getTouristManagement
 router.get('/map-overview', verifyToken, isAuthority, getMapOverview);
 router.delete('/revoke/:id', verifyToken, isAuthority, revokeTourist);
 router.get('/alerts', verifyToken, isAuthority, getNewSosAlerts);
+router.get('/alerts/responding', verifyToken, isAuthority, getRespondingSosAlerts);
 router.put('/alerts/:id/assign', verifyToken, isAuthority, assignUnitToAlert);
+router.put('/alerts/:id/resolve', verifyToken, isAuthority, resolveAlert);
 
 router.post("/signup", signUp);
 router.post("/login", signIn);
