@@ -71,6 +71,10 @@ app.use("/api/sos", sosRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/itinerary", itineraryRoutes);
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Register global error handler (must come after all route registrations)
 app.use(errorHandler);
 

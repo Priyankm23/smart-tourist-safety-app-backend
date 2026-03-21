@@ -77,6 +77,13 @@ exports.registerTourist = async (req, res, next) => {
     );
     const payload = `${touristId}|${govIdHash}|${dayWiseItineraryHash}|${registeredAtIso}`;
     const payloadHash = sha256Hex(payload);
+    // Debug log for blockchain audit troubleshooting
+    console.log('register: touristId=', touristId);
+    console.log('register: govIdHash=', govIdHash);
+    console.log('register: dayWiseItineraryHash=', dayWiseItineraryHash);
+    console.log('register: registeredAtIso=', registeredAtIso);
+    console.log('register: payload=', payload);
+    console.log('register: payloadHash=', payloadHash);
 
     // Create Tourist record
     const tourist = new Tourist({

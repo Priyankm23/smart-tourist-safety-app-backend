@@ -408,8 +408,11 @@ exports.emitAuthorityAlertToTourists = async (alertData) => {
 
   // Iterate through all connected tourists and filter by location
   for (let [touristId, socketSet] of touristSockets.entries()) {
+    const canonicalLocation = touristLastLocations.get(touristId);
+    
     for (let socket of socketSet) {
-      const touristLocation = socket.data.location;
+      // Fallback to socket.data.location if canonical location is missing
+      const touristLocation = canonicalLocation || socket.data.location;
 
       if (touristLocation && touristLocation.lat && touristLocation.lng) {
         const distance = calculateDistance(
@@ -418,6 +421,8 @@ exports.emitAuthorityAlertToTourists = async (alertData) => {
           touristLocation.lat,
           touristLocation.lng
         );
+
+        console.log(`Tourist ${touristId} is ${distance}m away from target (${targetLat}, ${targetLng})`);
 
         // If tourist is within the target radius, send the alert
         if (distance <= targetRadius) {
