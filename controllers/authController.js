@@ -6,8 +6,15 @@ const { decrypt } = require("../utils/encrypt.js");
 const { sha256Hex } = require("../utils/hash.js");
 const { hex64ToBytes32 } = require("../utils/ethFormat.js");
 const blockchain = require("../services/blockchainService.js");
+const QRCode = require("qrcode");
 
-const { JWT_SECRET, JWT_EXPIRES_IN , GOVID_SALT } = require("../config/config");
+const { JWT_SECRET, JWT_EXPIRES_IN, GOVID_SALT} = require("../config/config");
+const SERVER_URL= "https://smart-tourist-safety-app-backend-1.onrender.com";
+const QR_SIGN_SECRET = `${JWT_SECRET}_qr`;
+const QR_TOKEN_EXPIRES_IN = "180d";
+
+const normalizeHex = (h) =>
+  h ? (h.startsWith("0x") ? h.toLowerCase() : `0x${h.toLowerCase()}`) : h;
 
 exports.registerTourist = async (req, res, next) => {
   try {
@@ -322,6 +329,136 @@ exports.loginWithCodes = async (req, res, next) => {
     });
   } catch (err) {
     console.error("loginWithCodes error:", err);
+    next(err);
+  }
+};
+
+// GET /api/auth/qr/:touristId - Generate signed QR payload + image for tourist verification
+exports.generateTouristQR = async (req, res, next) => {
+  try {
+    const { touristId } = req.params;
+
+    const tourist = await Tourist.findOne({ touristId }).select("touristId role nationality expiresAt audit nameEncrypted");
+    if (!tourist) {
+      return res.status(404).json({ error: "Tourist not found" });
+    }
+
+    if (!tourist.audit?.eventId || !tourist.audit?.regHash) {
+      return res.status(400).json({
+        error: "Tourist does not have complete blockchain audit data",
+      });
+    }
+
+    const qrToken = jwt.sign(
+      {
+        touristId: tourist.touristId,
+        eventId: tourist.audit.eventId,
+        regTxHash: tourist.audit.regTxHash,
+      },
+      QR_SIGN_SECRET,
+      { expiresIn: QR_TOKEN_EXPIRES_IN },
+    );
+
+    const scanPath = `/api/auth/qr/scan/${qrToken}`;
+    const scanUrl = SERVER_URL ? `${SERVER_URL}${scanPath}` : scanPath;
+    const qrImageDataUrl = await QRCode.toDataURL(scanUrl, { margin: 2, width: 320 });
+
+    return res.status(200).json({
+      message: "QR generated successfully",
+      touristId: tourist.touristId,
+      scanUrl,
+      qrToken,
+      qrImageDataUrl,
+      preview: {
+        name: tourist.nameEncrypted ? decrypt(tourist.nameEncrypted) : "Unknown",
+        role: tourist.role,
+        nationality: tourist.nationality || null,
+      },
+      blockchain: {
+        eventId: tourist.audit.eventId,
+        regTxHash: tourist.audit.regTxHash,
+      },
+    });
+  } catch (err) {
+    console.error("generateTouristQR error:", err);
+    next(err);
+  }
+};
+
+// GET /api/auth/qr/scan/:token - Public scan endpoint (basic profile + blockchain proof)
+exports.scanTouristQR = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, QR_SIGN_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: "Invalid or expired QR token" });
+    }
+
+    const tourist = await Tourist.findOne({ touristId: decoded.touristId }).select(
+      "touristId role nationality createdAt expiresAt audit nameEncrypted",
+    );
+    if (!tourist) {
+      return res.status(404).json({ error: "Tourist not found" });
+    }
+
+    if (!tourist.audit?.eventId) {
+      return res.status(400).json({ error: "No blockchain eventId found for this tourist" });
+    }
+
+    const payloadHashToVerify = tourist.audit?.regHash;
+    if (!payloadHashToVerify) {
+      return res.status(400).json({ error: "No blockchain payload hash found for this tourist" });
+    }
+
+    let checkedContractAddress = blockchain.getConfiguredContractAddress();
+    const contractAddressFromTx = tourist.audit?.regTxHash
+      ? await blockchain.resolveContractAddressFromTx(tourist.audit.regTxHash)
+      : null;
+
+    let verified = await blockchain.verifyAuditRecord(
+      hex64ToBytes32(tourist.audit.eventId),
+      hex64ToBytes32(payloadHashToVerify),
+    );
+
+    if (!verified && contractAddressFromTx) {
+      const normalizedDefault = checkedContractAddress ? checkedContractAddress.toLowerCase() : null;
+      const normalizedFromTx = contractAddressFromTx.toLowerCase();
+
+      if (!normalizedDefault || normalizedDefault !== normalizedFromTx) {
+        verified = await blockchain.verifyAuditRecordAt(
+          contractAddressFromTx,
+          hex64ToBytes32(tourist.audit.eventId),
+          hex64ToBytes32(payloadHashToVerify),
+        );
+        checkedContractAddress = contractAddressFromTx;
+      }
+    }
+
+    return res.status(200).json({
+      source: "qr-scan",
+      verified,
+      basicTourist: {
+        touristId: tourist.touristId,
+        name: tourist.nameEncrypted ? decrypt(tourist.nameEncrypted) : "Unknown",
+        role: tourist.role,
+        nationality: tourist.nationality || null,
+        registrationDate: tourist.createdAt,
+        tripExpiryDate: tourist.expiresAt || null,
+      },
+      blockchain: {
+        eventId: tourist.audit.eventId,
+        regTxHash: tourist.audit.regTxHash,
+        payloadHash: tourist.audit.regHash,
+        payloadHashNormalized: normalizeHex(tourist.audit.regHash),
+        contractAddressChecked: checkedContractAddress,
+        contractAddressFromTx,
+      },
+    });
+  } catch (err) {
+    console.error("scanTouristQR error:", err);
     next(err);
   }
 };

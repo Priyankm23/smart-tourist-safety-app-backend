@@ -70,6 +70,7 @@ const TouristSchema = new mongoose.Schema({
     regHash: { type: String }, // SHA256 hash that was written to blockchain
     regTxHash: { type: String }, // blockchain tx hash
     eventId: { type: String },
+    dayWiseItineraryHash: { type: String },
     registeredAtIso: { type: String },
   },
 });

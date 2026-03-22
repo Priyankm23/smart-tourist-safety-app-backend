@@ -1,23 +1,18 @@
 const express = require('express');
-const {
-  getNewSosAlerts,
-  getRespondingSosAlerts,
-  getSosCounts,
-  getDashboardStats,
-  getTouristManagementData,
-  getExpiredTouristData,
-  revokeTourist,
-  getMapOverview,
-  signUp, signIn, verify, logOut,
-  assignUnitToAlert,
-  resolveAlert
-} = require('../controllers/authorityController');
+const { assignUnitToAlert, getRespondingSosAlerts, getNewSosAlerts, resolveAlert,getSosCounts } = require('../controllers/authority/SOSAlertPage')
+const { getExpiredTouristData, getTouristManagementData, revokeTourist } = require('../controllers/authority/touristPage')
+const { getDashboardStats } = require('../controllers/authority/dashboard')
+const { getMapOverview } = require('../controllers/authority/mapPage')
+const { signIn, signUp, logOut, verify } = require('../controllers/authority/authPage')
+const { predictCrowdSurge, getMedicalProfiling } = require('../controllers/authority/analytics');
 const { verifyToken, isAuthority } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 // The 'authorize' middleware checks if the authenticated user has the 'authority' role
 router.get('/dashboard-stats', verifyToken, isAuthority, getDashboardStats);
+router.get('/analytics/crowd-prediction', verifyToken, isAuthority, predictCrowdSurge);
+router.get('/analytics/medical-profiling', verifyToken, isAuthority, getMedicalProfiling);
 router.get('/tourist-management', verifyToken, isAuthority, getTouristManagementData);
 router.get('/expired-tourists', verifyToken, isAuthority, getExpiredTouristData);
 router.get('/map-overview', verifyToken, isAuthority, getMapOverview);

@@ -112,6 +112,8 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
 const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wallet);
 
+exports.getConfiguredContractAddress = () => CONTRACT_ADDRESS;
+
 /**
  * Store an audit record on blockchain
  * @param {string} eventIdBytes32 - 0x-prefixed 32-byte hex
@@ -153,6 +155,45 @@ exports.verifyAuditRecord = async (eventIdBytes32, payloadHashBytes32) => {
     console.error("❌ Blockchain verify failed:", err);
     throw err;
   }
+};
+
+/**
+ * Verify a record on a specific contract address
+ * @param {string} contractAddress - deployed contract address
+ * @param {string|Uint8Array} eventIdBytes32 - bytes32 event id
+ * @param {string|Uint8Array} payloadHashBytes32 - bytes32 payload hash
+ * @returns {boolean}
+ */
+exports.verifyAuditRecordAt = async (contractAddress, eventIdBytes32, payloadHashBytes32) => {
+	try {
+		const readContract = new ethers.Contract(contractAddress, ABI, provider);
+		const ok = await readContract.verify(eventIdBytes32, payloadHashBytes32);
+		console.log("✅ Verify result on specific contract:", { contractAddress, ok });
+		return ok;
+	} catch (err) {
+		console.error("❌ Blockchain verify failed on specific contract:", err);
+		throw err;
+	}
+};
+
+/**
+ * Resolve target contract address from a tx hash
+ * @param {string} txHash
+ * @returns {string|null}
+ */
+exports.resolveContractAddressFromTx = async (txHash) => {
+	try {
+		if (!txHash || typeof txHash !== "string") return null;
+
+		const receipt = await provider.getTransactionReceipt(txHash);
+		if (receipt && receipt.to) return receipt.to;
+
+		const tx = await provider.getTransaction(txHash);
+		return tx && tx.to ? tx.to : null;
+	} catch (err) {
+		console.error("❌ Failed to resolve contract address from tx hash:", err);
+		return null;
+	}
 };
 
 /**
