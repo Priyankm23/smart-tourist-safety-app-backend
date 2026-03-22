@@ -10,9 +10,9 @@ let touristLastScores = new Map(); // Store last safety score for each tourist
 let touristLastLocations = new Map();
 
 // Export the locations map to be used by analytics or other controllers
-// exports.getTouristLocations = () => touristLastLocations;
+exports.getTouristLocations = () => touristLastLocations;
 
-const SAFETY_POLL_INTERVAL_MS =  60 * 1000; // 30 minutes
+const SAFETY_POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 let safetyPollTimer = null;
 
 /**
@@ -450,25 +450,8 @@ exports.emitAuthorityAlertToTourists = async (alertData) => {
 exports.emitSOSStatusUpdate = async (alertData) => {
   if (io) {
     io.to('authorities').emit('sosAlertUpdated', alertData);
-
-    // Also notify the concerned tourist app (if touristId is provided in payload)
-    if (alertData.touristId) {
-      io.to(`tourist:${alertData.touristId}`).emit('sosStatusUpdate', alertData);
-    }
-
     console.log(`SOS status update broadcasted for alert ${alertData.alertId}`);
   }
-};
-
-/**
- * Emit explicit SOS assignment acknowledgement to the affected tourist.
- * @param {object} alertData assignment payload
- */
-exports.emitSOSAssignmentAcknowledgement = async (alertData) => {
-  if (!io || !alertData || !alertData.touristId) return;
-
-  io.to(`tourist:${alertData.touristId}`).emit('sosAssignedAcknowledgement', alertData);
-  console.log(`SOS assignment acknowledgement emitted to tourist ${alertData.touristId} for alert ${alertData.alertId}`);
 };
 
 /**

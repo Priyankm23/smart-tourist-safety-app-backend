@@ -245,7 +245,7 @@ exports.getSosCounts = async (req, res, next) => {
 exports.assignUnitToAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { responseTime, etaMinutes, etaArrivalAt } = req.body;
+    const { responseTime, etaMinutes, unitName, phoneNo } = req.body;
     // user.id or user._id depending on how it's stored in token. Usually user.id from decoded token.
     const authorityObjectId = req.user.id || req.user._id;
 
@@ -255,17 +255,25 @@ exports.assignUnitToAlert = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "SOS Alert not found" });
     }
 
-    // Resolve current authority record
-    const authority = await Authority.findById(authorityObjectId).select('authorityId fullName role');
-    if (!authority) {
-      return res.status(404).json({ success: false, message: 'Assigning authority not found' });
+    if (!unitName || !phoneNo) {
+      return res.status(400).json({ success: false, message: 'unitName and phoneNo are required' });
     }
 
-    // Note: allow same authority to be assigned to multiple alerts; do not block duplicates here.
+    // Resolve current authority record (the handler)
+    const authority = await Authority.findById(authorityObjectId).select('authorityId fullName role');
+    if (!authority) {
+      return res.status(404).json({ success: false, message: 'Assigning authority handler not found' });
+    }
 
-    // Update alert: Add authority info object to assignedTo, change status to 'responding' if it was 'new'
+    // Update alert: Add unit info to assignedTo, change status to 'responding' if it was 'new'
     if (!alert.assignedTo) alert.assignedTo = [];
-    alert.assignedTo.push({ authorityId: authority.authorityId, fullName: authority.fullName, role: authority.role });
+    alert.assignedTo.push({ 
+      authorityId: authority.authorityId, // Handler's ID
+      authorityName: authority.fullName,  // The handler's Name
+      unitName: unitName,                 // Store specific unit's name
+      role: 'Dispatched Unit', 
+      phoneNo: phoneNo                    // Unit's direct contact
+    });
 
     // Save response time if provided
     if (responseTime) {
@@ -273,7 +281,7 @@ exports.assignUnitToAlert = async (req, res, next) => {
       alert.responseTime = responseTime;
     }
 
-    // Optional ETA handling (minutes from now or absolute arrival timestamp)
+    // Optional ETA handling (minutes from now)
     if (etaMinutes !== undefined && etaMinutes !== null && etaMinutes !== "") {
       const parsedEtaMinutes = Number(etaMinutes);
       if (!Number.isFinite(parsedEtaMinutes) || parsedEtaMinutes < 0) {
@@ -281,16 +289,6 @@ exports.assignUnitToAlert = async (req, res, next) => {
       }
       alert.etaMinutes = parsedEtaMinutes;
       alert.etaArrivalAt = new Date(Date.now() + parsedEtaMinutes * 60 * 1000);
-      alert.etaUpdatedAt = new Date();
-      alert.etaUpdatedBy = authority.authorityId;
-    } else if (etaArrivalAt) {
-      const parsedArrival = new Date(etaArrivalAt);
-      if (Number.isNaN(parsedArrival.getTime())) {
-        return res.status(400).json({ success: false, message: 'etaArrivalAt must be a valid ISO datetime' });
-      }
-      alert.etaArrivalAt = parsedArrival;
-      const deltaMs = parsedArrival.getTime() - Date.now();
-      alert.etaMinutes = Math.max(0, Math.round(deltaMs / 60000));
       alert.etaUpdatedAt = new Date();
       alert.etaUpdatedBy = authority.authorityId;
     }

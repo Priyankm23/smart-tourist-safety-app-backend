@@ -55,12 +55,14 @@ const sosAlertSchema = new mongoose.Schema(
     alertIdOnChain: { type: String }, // bytes32 alertId for blockchain reference
     payloadHashOnChain: { type: String }, // hash of the payload stored on-chain
 
-    // Authorities assigned to handle the SOS
-    // Store authority identifier and display name (gov id, full name, role)
+    // Authorities/Units assigned to handle the SOS
+    // Store assigned unit's name and contact number
     assignedTo: [{
-      authorityId: { type: String },
-      fullName: { type: String },
-      role: { type: String }
+      authorityId: { type: String }, // The handler's ID (authority)
+      authorityName: { type: String }, // The handler's Name
+      unitName: { type: String }, // Name of the dispatched unit (e.g. Unit 4)
+      role: { type: String },
+      phoneNo: { type: String }      // Contact number of the unit
     }],
 
     // Response time formatted string (e.g., "00:57:54") sent by frontend
