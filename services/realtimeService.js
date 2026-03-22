@@ -450,8 +450,25 @@ exports.emitAuthorityAlertToTourists = async (alertData) => {
 exports.emitSOSStatusUpdate = async (alertData) => {
   if (io) {
     io.to('authorities').emit('sosAlertUpdated', alertData);
+
+    // Also notify the concerned tourist app (if touristId is provided in payload)
+    if (alertData.touristId) {
+      io.to(`tourist:${alertData.touristId}`).emit('sosStatusUpdate', alertData);
+    }
+
     console.log(`SOS status update broadcasted for alert ${alertData.alertId}`);
   }
+};
+
+/**
+ * Emit explicit SOS assignment acknowledgement to the affected tourist.
+ * @param {object} alertData assignment payload
+ */
+exports.emitSOSAssignmentAcknowledgement = async (alertData) => {
+  if (!io || !alertData || !alertData.touristId) return;
+
+  io.to(`tourist:${alertData.touristId}`).emit('sosAssignedAcknowledgement', alertData);
+  console.log(`SOS assignment acknowledgement emitted to tourist ${alertData.touristId} for alert ${alertData.alertId}`);
 };
 
 /**

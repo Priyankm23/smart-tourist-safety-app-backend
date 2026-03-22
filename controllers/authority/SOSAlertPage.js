@@ -245,10 +245,11 @@ exports.getSosCounts = async (req, res, next) => {
 exports.assignUnitToAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
+    const { responseTime, etaMinutes, etaArrivalAt } = req.body;
     // user.id or user._id depending on how it's stored in token. Usually user.id from decoded token.
     const authorityObjectId = req.user.id || req.user._id;
 
-    const alert = await SOSAlert.findById(id);
+    const alert = await SOSAlert.findById(id).populate('touristId', 'touristId');
 
     if (!alert) {
       return res.status(404).json({ success: false, message: "SOS Alert not found" });
@@ -267,9 +268,31 @@ exports.assignUnitToAlert = async (req, res, next) => {
     alert.assignedTo.push({ authorityId: authority.authorityId, fullName: authority.fullName, role: authority.role });
 
     // Save response time if provided
-    if (req.body.responseTime) {
-      console.log(req.body.responseTime)
-      alert.responseTime = req.body.responseTime;
+    if (responseTime) {
+      console.log(responseTime)
+      alert.responseTime = responseTime;
+    }
+
+    // Optional ETA handling (minutes from now or absolute arrival timestamp)
+    if (etaMinutes !== undefined && etaMinutes !== null && etaMinutes !== "") {
+      const parsedEtaMinutes = Number(etaMinutes);
+      if (!Number.isFinite(parsedEtaMinutes) || parsedEtaMinutes < 0) {
+        return res.status(400).json({ success: false, message: 'etaMinutes must be a non-negative number' });
+      }
+      alert.etaMinutes = parsedEtaMinutes;
+      alert.etaArrivalAt = new Date(Date.now() + parsedEtaMinutes * 60 * 1000);
+      alert.etaUpdatedAt = new Date();
+      alert.etaUpdatedBy = authority.authorityId;
+    } else if (etaArrivalAt) {
+      const parsedArrival = new Date(etaArrivalAt);
+      if (Number.isNaN(parsedArrival.getTime())) {
+        return res.status(400).json({ success: false, message: 'etaArrivalAt must be a valid ISO datetime' });
+      }
+      alert.etaArrivalAt = parsedArrival;
+      const deltaMs = parsedArrival.getTime() - Date.now();
+      alert.etaMinutes = Math.max(0, Math.round(deltaMs / 60000));
+      alert.etaUpdatedAt = new Date();
+      alert.etaUpdatedBy = authority.authorityId;
     }
 
     if (alert.status === 'new' || alert.status === 'acknowledged') {
@@ -283,17 +306,36 @@ exports.assignUnitToAlert = async (req, res, next) => {
     await alert.save();
     
     // Construct real-time payload
+    const touristRoomId = alert.touristId && typeof alert.touristId === 'object'
+      ? alert.touristId.touristId
+      : null;
+
     const alertData = {
       alertId: alert._id,
+      touristId: touristRoomId,
       status: alert.status,
       assignedTo: alert.assignedTo,
       responseDate: alert.responseDate,
-      responseTime: alert.responseTime // if set
+      responseTime: alert.responseTime, // if set
+      etaMinutes: alert.etaMinutes,
+      etaArrivalAt: alert.etaArrivalAt,
+      etaUpdatedAt: alert.etaUpdatedAt,
+      etaUpdatedBy: alert.etaUpdatedBy,
     };
     
     // Emit real-time update
     const realtimeService = require('../../services/realtimeService');
     realtimeService.emitSOSStatusUpdate(alertData).catch(err => console.error("Socket emit error:", err));
+    realtimeService.emitSOSAssignmentAcknowledgement({
+      ...alertData,
+      acknowledgementType: 'unit-assigned',
+      message: 'Your SOS has been acknowledged. A response unit has been assigned.',
+      assignedUnit: alert.assignedTo[alert.assignedTo.length - 1] || null,
+      acknowledgedAt: alert.responseDate || new Date(),
+      etaLabel: alert.etaMinutes !== undefined && alert.etaMinutes !== null
+        ? `Estimated arrival in ${alert.etaMinutes} minute(s)`
+        : null,
+    }).catch(err => console.error("Socket emit error:", err));
 
     res.status(200).json({
       success: true,

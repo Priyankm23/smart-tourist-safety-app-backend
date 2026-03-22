@@ -66,6 +66,12 @@ const sosAlertSchema = new mongoose.Schema(
     // Response time formatted string (e.g., "00:57:54") sent by frontend
     responseTime: { type: String },
 
+    // ETA details for tourist acknowledgement and live countdown
+    etaMinutes: { type: Number, min: 0 },
+    etaArrivalAt: { type: Date },
+    etaUpdatedAt: { type: Date },
+    etaUpdatedBy: { type: String },
+
     // Auditable timestamps
     responseDate: { type: Date }, // Time when authority was assigned
     resolvedDate: { type: Date }, // Time when alert was marked resolved
