@@ -455,6 +455,20 @@ exports.emitSOSStatusUpdate = async (alertData) => {
 };
 
 /**
+ * Emits an SOS acknowledgement sent specifically back to the corresponding tourist.
+ * @param {object} ackData The acknowledgement data detailing the assigned unit.
+ */
+exports.emitSOSAssignmentAcknowledgement = async (ackData) => {
+  if (io && ackData.touristId) {
+    const roomId = `tourist:${ackData.touristId}`;
+    io.to(roomId).emit('sosAcknowledgement', ackData);
+    console.log(`SOS acknowledgement sent to tourist ${ackData.touristId}`);
+  } else {
+    console.warn("Could not emit SOS Acknowledgement: missing io or touristId", !!io, ackData.touristId);
+  }
+};
+
+/**
  * Emits a new danger zone event to all connected authorities.
  * @param {object} zoneData The new danger zone data.
  */
