@@ -10,7 +10,7 @@ let touristLastScores = new Map(); // Store last safety score for each tourist
 let touristLastLocations = new Map();
 
 // Export the locations map to be used by analytics or other controllers
-exports.getTouristLocations = () => touristLastLocations;
+// exports.getTouristLocations = () => touristLastLocations;
 
 const SAFETY_POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 let safetyPollTimer = null;

@@ -16,6 +16,16 @@ const QR_TOKEN_EXPIRES_IN = "180d";
 const normalizeHex = (h) =>
   h ? (h.startsWith("0x") ? h.toLowerCase() : `0x${h.toLowerCase()}`) : h;
 
+const escapeHtml = (value) => {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+};
+
 exports.registerTourist = async (req, res, next) => {
   try {
     const {
@@ -437,7 +447,7 @@ exports.scanTouristQR = async (req, res, next) => {
       }
     }
 
-    return res.status(200).json({
+    const responsePayload = {
       source: "qr-scan",
       verified,
       basicTourist: {
@@ -456,7 +466,169 @@ exports.scanTouristQR = async (req, res, next) => {
         contractAddressChecked: checkedContractAddress,
         contractAddressFromTx,
       },
-    });
+    };
+
+    if (req.query.format === "json") {
+      return res.status(200).json(responsePayload);
+    }
+
+    const statusLabel = responsePayload.verified ? "Verified" : "Not Verified";
+    const statusClass = responsePayload.verified ? "ok" : "bad";
+    const registrationDate = responsePayload.basicTourist.registrationDate
+      ? new Date(responsePayload.basicTourist.registrationDate).toLocaleString("en-IN")
+      : "N/A";
+    const expiryDate = responsePayload.basicTourist.tripExpiryDate
+      ? new Date(responsePayload.basicTourist.tripExpiryDate).toLocaleString("en-IN")
+      : "N/A";
+
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tourist Verification Card</title>
+  <style>
+    :root {
+      --bg: #f2f6ff;
+      --card: #ffffff;
+      --text: #10223e;
+      --muted: #5a6780;
+      --line: #d9e2f1;
+      --ok: #118a43;
+      --bad: #c62828;
+      --accent: #1f4d8f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 20% 10%, #e8f0ff, var(--bg));
+      color: var(--text);
+      padding: 24px;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(31, 77, 143, 0.08);
+      overflow: hidden;
+    }
+    .header {
+      padding: 16px 20px;
+      background: linear-gradient(135deg, #1f4d8f, #2f6bc2);
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+    .status {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #fff;
+    }
+    .status.ok { color: var(--ok); }
+    .status.bad { color: var(--bad); }
+    .body {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      background: #fcfdff;
+    }
+    .section h3 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      color: var(--accent);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 210px 1fr;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--line);
+      font-size: 14px;
+    }
+    .row:last-child { border-bottom: none; }
+    .key { color: var(--muted); font-weight: 600; }
+    .value {
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #1a2f52;
+    }
+    .value.normal {
+      font-family: inherit;
+      color: var(--text);
+    }
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      margin-top: 8px;
+    }
+    @media (max-width: 680px) {
+      .row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <header class="header">
+        <div class="title">Tourist Verification ID Card</div>
+        <div class="status ${statusClass}">${statusLabel}</div>
+      </header>
+      <div class="body">
+        <section class="section">
+          <h3>Basic Tourist Details</h3>
+          <div class="row"><div class="key">Tourist ID</div><div class="value normal">${escapeHtml(responsePayload.basicTourist.touristId)}</div></div>
+          <div class="row"><div class="key">Name</div><div class="value normal">${escapeHtml(responsePayload.basicTourist.name)}</div></div>
+          <div class="row"><div class="key">Role</div><div class="value normal">${escapeHtml(responsePayload.basicTourist.role || "N/A")}</div></div>
+          <div class="row"><div class="key">Nationality</div><div class="value normal">${escapeHtml(responsePayload.basicTourist.nationality || "N/A")}</div></div>
+          <div class="row"><div class="key">Registration Date</div><div class="value normal">${escapeHtml(registrationDate)}</div></div>
+          <div class="row"><div class="key">Trip Expiry Date</div><div class="value normal">${escapeHtml(expiryDate)}</div></div>
+        </section>
+
+        <section class="section">
+          <h3>Blockchain Audit Trail</h3>
+          <div class="row"><div class="key">Event ID</div><div class="value">${escapeHtml(responsePayload.blockchain.eventId)}</div></div>
+          <div class="row"><div class="key">Registration Tx Hash</div><div class="value">${escapeHtml(responsePayload.blockchain.regTxHash || "N/A")}</div></div>
+          <div class="row"><div class="key">Payload Hash</div><div class="value">${escapeHtml(responsePayload.blockchain.payloadHash || "N/A")}</div></div>
+          <div class="row"><div class="key">Payload Hash (Normalized)</div><div class="value">${escapeHtml(responsePayload.blockchain.payloadHashNormalized || "N/A")}</div></div>
+          <div class="row"><div class="key">Contract Address Checked</div><div class="value">${escapeHtml(responsePayload.blockchain.contractAddressChecked || "N/A")}</div></div>
+          <div class="row"><div class="key">Contract Address From Tx</div><div class="value">${escapeHtml(responsePayload.blockchain.contractAddressFromTx || "N/A")}</div></div>
+        </section>
+
+        <div class="footer-note">This page shows basic identity data and immutable blockchain proof for verification purposes.</div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>`;
+
+    return res.status(200).type("html").send(html);
   } catch (err) {
     console.error("scanTouristQR error:", err);
     next(err);
