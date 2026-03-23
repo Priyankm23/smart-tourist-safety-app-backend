@@ -1,9 +1,10 @@
 const { decrypt } = require('../../utils/encrypt');
-const Transition = require('../../models/Transition');
 const Incident = require('../../models/Incident');
 const RiskGrid = require('../../models/RiskGrid');
 const Authority = require('../../models/Authority');
 const SOSAlert = require('../../models/SOSAlertModel');
+const Tourist = require('../../models/Tourist');
+const { DangerZone } = require("../../models/Geofence");
 
 // @desc    Get real-time map data (Tourists, Zones, Alerts, Incidents)
 // @route   GET /api/authority/map-overview
@@ -12,33 +13,14 @@ exports.getMapOverview = async (req, res, next) => {
   try {
     // 1. Fetch Aggregated stats for the panel
     const totalTourists = await Tourist.countDocuments();
-    const activeAlertsCount = await SOSAlert.countDocuments({ status: { $in: ['new', 'responding'] } });
+    const activeAlertsCount = await SOSAlert.countDocuments({ status: { $in: ['new'] } });
     const highRiskZonesCount = await DangerZone.countDocuments({ riskLevel: { $in: ['High', 'Very High'] } });
     const responseUnitsCount = await Authority.countDocuments({ role: { $in: ['Emergency Responder', 'Police Officer'] }, isActive: true });
 
-    // 2. Fetch Tourists with their latest location
-    // We get the latest transition for each tourist to pinpoint them on the map
-    const latestTransitions = await Transition.aggregate([
-      { $sort: { timestamp: -1 } },
-      {
-        $group: {
-          _id: "$digitalId",
-          location: { $first: "$location" },
-          timestamp: { $first: "$timestamp" }
-        }
-      }
-    ]);
-
-    // Create a map for quick lookup of location by touristId
-    const locMap = {};
-    latestTransitions.forEach(t => {
-      locMap[t._id] = t.location; // { latitude, longitude }
-    });
-
+    // 2. Fetch Tourists (without Transition-derived locations)
     const touristsRaw = await Tourist.find({}).select('touristId nameEncrypted safetyScore expiresAt').lean();
 
     const tourists = touristsRaw.map(t => {
-      const loc = locMap[t.touristId];
       let name = "Unknown";
       try {
         if (t.nameEncrypted) name = decrypt(t.nameEncrypted);
@@ -46,21 +28,15 @@ exports.getMapOverview = async (req, res, next) => {
 
       const isActive = t.expiresAt && new Date(t.expiresAt) > new Date();
 
-      // Let's exclude tourists with no location history for the map view.
-      if (!loc) return null;
-
       return {
         id: t.touristId,
         name: name,
         status: isActive ? 'active' : 'expired',
         safetyScore: t.safetyScore,
-        location: {
-          lat: loc.latitude,
-          lng: loc.longitude
-        },
+        location: null,
         type: 'tourist'
       };
-    }).filter(t => t !== null);
+    });
 
 
     // 3. Fetch Danger Zones

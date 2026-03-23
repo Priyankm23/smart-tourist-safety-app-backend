@@ -1,9 +1,5 @@
 const SOSAlert = require('../../models/SOSAlertModel');
-const { DangerZone } = require("../../models/Geofence");
-const { CustomError } = require('../../middlewares/errorMiddleware');
 const { decrypt } = require('../../utils/encrypt');
-const Transition = require('../../models/Transition');
-const Incident = require('../../models/Incident');
 const RiskGrid = require('../../models/RiskGrid');
 const Authority = require('../../models/Authority');
 const jwt = require('jsonwebtoken');
@@ -245,7 +241,7 @@ exports.getSosCounts = async (req, res, next) => {
 exports.assignUnitToAlert = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { responseTime, etaMinutes, etaArrivalAt } = req.body;
+    const { responseTime, etaMinutes } = req.body;
     // user.id or user._id depending on how it's stored in token. Usually user.id from decoded token.
     const authorityObjectId = req.user.id || req.user._id;
 
@@ -273,27 +269,19 @@ exports.assignUnitToAlert = async (req, res, next) => {
       alert.responseTime = responseTime;
     }
 
-    // Optional ETA handling (minutes from now or absolute arrival timestamp)
-    if (etaMinutes !== undefined && etaMinutes !== null && etaMinutes !== "") {
-      const parsedEtaMinutes = Number(etaMinutes);
-      if (!Number.isFinite(parsedEtaMinutes) || parsedEtaMinutes < 0) {
-        return res.status(400).json({ success: false, message: 'etaMinutes must be a non-negative number' });
-      }
-      alert.etaMinutes = parsedEtaMinutes;
-      alert.etaArrivalAt = new Date(Date.now() + parsedEtaMinutes * 60 * 1000);
-      alert.etaUpdatedAt = new Date();
-      alert.etaUpdatedBy = authority.authorityId;
-    } else if (etaArrivalAt) {
-      const parsedArrival = new Date(etaArrivalAt);
-      if (Number.isNaN(parsedArrival.getTime())) {
-        return res.status(400).json({ success: false, message: 'etaArrivalAt must be a valid ISO datetime' });
-      }
-      alert.etaArrivalAt = parsedArrival;
-      const deltaMs = parsedArrival.getTime() - Date.now();
-      alert.etaMinutes = Math.max(0, Math.round(deltaMs / 60000));
-      alert.etaUpdatedAt = new Date();
-      alert.etaUpdatedBy = authority.authorityId;
+    // ETA is provided only as minutes by frontend; arrival time is computed server-side
+    if (etaMinutes === undefined || etaMinutes === null || etaMinutes === "") {
+      return res.status(400).json({ success: false, message: 'etaMinutes is required' });
     }
+
+    const parsedEtaMinutes = Number(etaMinutes);
+    if (!Number.isFinite(parsedEtaMinutes) || parsedEtaMinutes < 0) {
+      return res.status(400).json({ success: false, message: 'etaMinutes must be a non-negative number' });
+    }
+    alert.etaMinutes = parsedEtaMinutes;
+    alert.etaArrivalAt = new Date(Date.now() + parsedEtaMinutes * 60 * 1000);
+    alert.etaUpdatedAt = new Date();
+    alert.etaUpdatedBy = authority.authorityId;
 
     if (alert.status === 'new' || alert.status === 'acknowledged') {
       alert.status = 'responding';

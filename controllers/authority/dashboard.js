@@ -237,6 +237,26 @@ exports.getDashboardStats = async (req, res, next) => {
       ? Math.round((soloCount / (soloCount + groupCount)) * 100) 
       : 0;
 
+    // Solo vs Group Risk Ratio Analysis
+    const totalActiveTourists = activeTouristsCount || 1; // prevent div by zero
+    const activeSoloTourists = await Tourist.countDocuments({ 
+      expiresAt: { $gt: new Date() }, 
+      role: 'solo', 
+      groupId: { $exists: false } 
+    });
+    
+    const demographicSoloPercentage = Math.round((activeSoloTourists / totalActiveTourists) * 100);
+    
+    // Evaluate risk disproportion
+    let soloRiskMessage = "Standard risk distribution.";
+    if (soloPercentage > demographicSoloPercentage * 1.5 && soloCount > 5) {
+      soloRiskMessage = `CRITICAL: Solo travelers account for ${soloPercentage}% of SOS alerts but only ${demographicSoloPercentage}% of the current tourist population. Consider broadcasting targeted safety guidelines for lone travelers.`;
+    } else if (soloPercentage > demographicSoloPercentage * 1.2 && soloCount > 5) {
+      soloRiskMessage = `Elevated Risk: Solo travelers are disproportionately triggering SOS alerts (Alerts: ${soloPercentage}%, Population: ${demographicSoloPercentage}%).`;
+    } else {
+      soloRiskMessage = `Solo traveler SOS rate (${soloPercentage}%) aligns with their population representation (${demographicSoloPercentage}%).`;
+    }
+
     // e. Unit Utilization
     // Total active units
     const totalUnits = await Authority.countDocuments({ 
@@ -450,6 +470,8 @@ exports.getDashboardStats = async (req, res, next) => {
           demographics: {
             mostSosFromAge: topAgeGroup,
             soloTravelersPercent: `${soloPercentage}%`,
+            populationSoloPercent: `${demographicSoloPercentage}%`,
+            soloRiskInsight: soloRiskMessage,
             topGroup: topNationality
           },
           predictions: {
