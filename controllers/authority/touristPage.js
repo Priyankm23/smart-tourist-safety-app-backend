@@ -7,11 +7,24 @@ const { decrypt } = require('../../utils/encrypt');
 exports.getTouristManagementData = async (req, res, next) => {
   try {
     const { search } = req.query; // Optional filters
+    const now = new Date();
+
+    const activeFilter = {
+      $or: [
+        { expiresAt: { $gt: now } },
+        { expiresAt: null },
+        { expiresAt: { $exists: false } },
+      ],
+    };
+
+    const expiredFilter = {
+      expiresAt: { $ne: null, $lte: now },
+    };
 
     // 1. Calculate Summary Stats
     const totalTourists = await Tourist.countDocuments();
-    const activeTourists = await Tourist.countDocuments({ expiresAt: { $gt: new Date() } });
-    const expiredTourists = await Tourist.countDocuments({ expiresAt: { $lte: new Date() } });
+    const activeTourists = await Tourist.countDocuments(activeFilter);
+    const expiredTourists = await Tourist.countDocuments(expiredFilter);
 
     // Average Safety Score
     const avgScoreResult = await Tourist.aggregate([
@@ -20,9 +33,7 @@ exports.getTouristManagementData = async (req, res, next) => {
     const averageSafetyScore = avgScoreResult.length > 0 ? Math.round(avgScoreResult[0].avg) : 0;
 
     // 2. Fetch Tourist Registry List - ACTIVE ONLY
-    let query = {
-      expiresAt: { $gt: new Date() }
-    };
+    let query = { ...activeFilter };
 
     if (search) {
       // Simple search on touristId (which is plaintext)
@@ -91,9 +102,10 @@ exports.getTouristManagementData = async (req, res, next) => {
 exports.getExpiredTouristData = async (req, res, next) => {
   try {
     const { search } = req.query;
+    const now = new Date();
 
     const query = {
-      expiresAt: { $lte: new Date() } // ONLY EXPIRED
+      expiresAt: { $ne: null, $lte: now } // ONLY EXPIRED
     };
 
     if (search) {

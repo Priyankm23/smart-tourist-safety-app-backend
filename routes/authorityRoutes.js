@@ -14,7 +14,7 @@ const router = express.Router();
 // The 'authorize' middleware checks if the authenticated user has the 'authority' role
 router.get('/dashboard-stats', getDashboardStats);
 router.get('/analytics/crowd-prediction', verifyToken, isAuthority, predictCrowdSurge);
-router.get('/tourist-management', verifyToken, isAuthority, getTouristManagementData);
+router.get('/tourist-management', getTouristManagementData);
 router.get('/expired-tourists', verifyToken, isAuthority, getExpiredTouristData);
 router.get('/map-overview', verifyToken, isAuthority, getMapOverview);
 router.post('/map/danger-zone', verifyToken, isAuthority, createGeoFenceToDangerLocation);
