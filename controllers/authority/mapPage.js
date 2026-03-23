@@ -26,7 +26,7 @@ exports.getMapOverview = async (req, res, next) => {
         if (t.nameEncrypted) name = decrypt(t.nameEncrypted);
       } catch (e) { }
 
-      const isActive = t.expiresAt && new Date(t.expiresAt) > new Date();
+      const isActive = !t.expiresAt || new Date(t.expiresAt) > new Date();
 
       return {
         id: t.touristId,
