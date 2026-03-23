@@ -260,8 +260,17 @@ const sendWelcomeEmail = async (memberData, guideId, groupAccessCode, groupName,
       html: htmlContent,
     });
 
+    if (result?.error) {
+      throw new Error(result.error.message || "Email provider rejected welcome email request");
+    }
+
+    const messageId = result?.data?.id || result?.id || null;
+    if (!messageId) {
+      throw new Error("Email provider did not return a message id");
+    }
+
     console.log("Welcome email sent successfully:", result);
-    return { success: true, messageId: result.id };
+    return { success: true, messageId };
   } catch (error) {
     console.error("Error sending welcome email:", error);
     return { success: false, error: error.message };
@@ -377,8 +386,17 @@ const sendProfileUpdateEmail = async (memberEmail, memberName, updatedFields, ad
       html: htmlContent,
     });
 
+    if (result?.error) {
+      throw new Error(result.error.message || "Email provider rejected profile update email request");
+    }
+
+    const messageId = result?.data?.id || result?.id || null;
+    if (!messageId) {
+      throw new Error("Email provider did not return a message id");
+    }
+
     console.log("Profile update email sent successfully:", result);
-    return { success: true, messageId: result.id };
+    return { success: true, messageId };
   } catch (error) {
     console.error("Error sending profile update email:", error);
     return { success: false, error: error.message };
