@@ -708,7 +708,7 @@ exports.sendWelcomeEmailsToAll = async (req, res, next) => {
     const group = await TourGroup.findById(admin.ownedGroupId)
       .populate({
         path: "members.touristId",
-        select: "touristId nameEncrypted email welcomeEmailSent _id",
+        select: "touristId nameEncrypted email _id",
       })
       .lean();
 
@@ -727,24 +727,18 @@ exports.sendWelcomeEmailsToAll = async (req, res, next) => {
       });
     }
 
-    // 4. Prepare member data for emails - ONLY members who haven't received email yet
+    // 4. Prepare member data for emails (resend allowed for all valid members)
     const membersData = group.members
       .map((m) => {
         const tourist = m.touristId;
         if (!tourist || !tourist.email) return null;
-
-        // Skip if email already sent
-        if (tourist.welcomeEmailSent) {
-          console.log(`Skipping ${tourist.touristId} - email already sent`);
-          return null;
-        }
 
         try {
           return {
             name: decrypt(tourist.nameEncrypted),
             email: tourist.email,
             touristId: tourist.touristId,
-            _id: tourist._id, // Include MongoDB _id for updating the flag
+            _id: tourist._id,
           };
         } catch (err) {
           console.error("Error decrypting member data:", err);
@@ -753,17 +747,10 @@ exports.sendWelcomeEmailsToAll = async (req, res, next) => {
       })
       .filter(Boolean);
 
-    // Count members who already received emails
-    const alreadySentCount = group.members.filter(
-      (m) => m.touristId && m.touristId.welcomeEmailSent
-    ).length;
-
     if (membersData.length === 0) {
       return res.status(400).json({
         success: false,
-        message: alreadySentCount > 0 
-          ? `All ${alreadySentCount} members have already received welcome emails` 
-          : "No valid members found with email addresses",
+        message: "No valid members found with email addresses",
       });
     }
 
@@ -779,6 +766,31 @@ exports.sendWelcomeEmailsToAll = async (req, res, next) => {
       group.groupName,
       adminName
     );
+
+    const failedMessages = emailResults.results
+      .map((result) => {
+        if (result.status === "fulfilled" && !result.value?.success) {
+          return result.value?.error;
+        }
+        if (result.status === "rejected") {
+          return result.reason?.message || "Unknown email send error";
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    if (emailResults.successful === 0) {
+      return res.status(502).json({
+        success: false,
+        message: failedMessages[0] || "Failed to send welcome emails",
+        data: {
+          totalMembers: group.members.length,
+          targetedMembers: membersData.length,
+          emailsSent: 0,
+          emailsFailed: emailResults.failed,
+        },
+      });
+    }
 
     // 6. Update welcomeEmailSent flag for successfully sent emails
     const successfulEmails = emailResults.results
@@ -804,8 +816,8 @@ exports.sendWelcomeEmailsToAll = async (req, res, next) => {
       message: `Welcome emails sent: ${emailResults.successful}/${emailResults.total} successful`,
       data: {
         totalMembers: group.members.length,
-        alreadySent: alreadySentCount,
-        newEmailsSent: emailResults.successful,
+        targetedMembers: membersData.length,
+        emailsSent: emailResults.successful,
         emailsFailed: emailResults.failed,
       },
     });
