@@ -259,7 +259,7 @@ exports.getDashboardStats = async (req, res, next) => {
 
     // e. Unit Utilization
     // Total active units
-    const totalUnits = await Authority.countDocuments({ 
+    const totalAuthorities = await Authority.countDocuments({ 
       role: { $in: ['Emergency Responder', 'Police Officer'] }, 
       isActive: true 
     });
@@ -269,17 +269,17 @@ exports.getDashboardStats = async (req, res, next) => {
       status: { $in: ['new', 'responding'] } 
     }).select('assignedTo');
     
-    const engagedUnitIds = new Set();
+    const engagedAuthoritiesIds = new Set();
     openAlerts.forEach(alert => {
       if (alert.assignedTo && Array.isArray(alert.assignedTo)) {
         alert.assignedTo.forEach(assignment => {
-          if (assignment.authorityId) engagedUnitIds.add(assignment.authorityId);
+          if (assignment.authorityId) engagedAuthoritiesIds.add(assignment.authorityId);
         });
       }
     });
     
-    const engagedCount = engagedUnitIds.size;
-    const utilizationPercent = totalUnits > 0 ? Math.round((engagedCount / totalUnits) * 100) : 0;
+    const engagedCount = engagedAuthoritiesIds.size;
+    const utilizationPercent = totalAuthorities > 0 ? Math.round((engagedCount / totalAuthorities) * 100) : 0;
 
     // f. Generate Real-Time Predictions and Patterns based on data
     
@@ -460,8 +460,8 @@ exports.getDashboardStats = async (req, res, next) => {
           unitUtilization: {
             percent: utilizationPercent,
             engaged: engagedCount,
-            total: totalUnits,
-            label: `${utilizationPercent}% units engaged`
+            total: totalAuthorities,
+            label: `${utilizationPercent}% Authorities engaged with assinging units`
           },
           incidentAnalysis: {
             severityBreakdown: severityStats,

@@ -472,13 +472,26 @@ exports.emitSOSAssignmentAcknowledgement = async (alertData) => {
 };
 
 /**
- * Emits a new danger zone event to all connected authorities.
+ * Emits a new danger zone event to authority and tourist clients.
  * @param {object} zoneData The new danger zone data.
  */
 exports.emitDangerZoneAdded = async (zoneData) => {
   if (io) {
     io.to('authorities').emit('dangerZoneAdded', zoneData);
+    io.to('tourists').emit('dangerZoneAdded', zoneData);
     console.log(`New danger zone broadcasted: ${zoneData.id || zoneData._id}`);
+  }
+};
+
+/**
+ * Emits a generic map data update event to authority and tourist clients.
+ * @param {object} payload The map update payload.
+ */
+exports.emitMapDataUpdated = async (payload) => {
+  if (io) {
+    io.to('authorities').emit('mapDataUpdated', payload);
+    io.to('tourists').emit('mapDataUpdated', payload);
+    console.log(`Map data update broadcasted: ${payload?.eventType || 'unknown'}`);
   }
 };
 
