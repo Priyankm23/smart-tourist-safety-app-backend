@@ -1,6 +1,6 @@
 # SafeTrail — Smart Tourist Safety System · Backend
 
-> > A Node.js backend powering real-time tourist safety: dynamic risk scoring, geofencing, SOS management, tour group coordination, and blockchain-backed audit trails — serving both a React Native tourist app and a React authority command center from a single API.
+> A Node.js backend powering real-time tourist safety: dynamic risk scoring, geofencing, SOS management, tour group coordination, and blockchain-backed audit trails — serving both a React Native tourist app and a React authority command center from a single API.
 
 **Live Authority Dashboard →** [authority.safetrail.in](https://authority.safetrail.in) &nbsp;·&nbsp; **Project Landing Page →** [safetrail.in](https://safetrail.in) &nbsp;·&nbsp; **Download APK →** [safetrail.in/#explore](https://safetrail.in/#explore)
 
