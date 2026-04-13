@@ -2,7 +2,7 @@
 
 > A Node.js backend powering real-time tourist safety: dynamic risk scoring, geofencing, SOS management, tour group coordination, and blockchain-backed audit trails — serving both a React Native tourist app and a React authority command center from a single API.
 
-**Live Authority Dashboard →** [authority.safetrail.in](https://authority.safetrail.in) &nbsp;·&nbsp; **Project Landing Page →** [safetrail.in](https://safetrail.in) &nbsp;·&nbsp; **Download APK →** [safetrail APK](https://github.com/Meetpatel006/smart-safety/releases/download/v1.4.1/SmartSafety-1.4.1-release.apk)
+**Live Authority Dashboard →** [Vercel Deployed Authority Dashboard](https://safetrail-authority-dashboard.vercel.app/) &nbsp;·&nbsp; **Project Landing Page →** [Safetrail - landing page](https://safetrail-your-safety-in-your-mobile.vercel.app/) &nbsp;·&nbsp; **Download APK →** [Safetrail APK](https://github.com/Meetpatel006/smart-safety/releases/download/v1.4.1/SmartSafety-1.4.1-release.apk)
 
 ![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express.js-black?style=flat-square&logo=express)
@@ -240,12 +240,14 @@ Full contract: [`API_CONTRACT.md`](./API_CONTRACT.md) &nbsp;·&nbsp; SRS: [`FINA
 
 ## Related Repositories
 
+click on the repo column to navigate to the actual repos which are used for the project
+
 | Repo | Stack | Description |
 |---|---|---|
-| `smart-tourist-safety-app-backend` | Node.js, Express, MongoDB | ← **This repo** |
-| `tourist-app-frontend` | React Native, Expo, Mapbox | Tourist mobile app |
-| `authority-dashboard-frontend` | React, Mapbox | Authority command center UI |
-| `path-deviation-microservice` | FastAPI, Python | Path tracking & deviation alerts |
+| `[tourist-safety-app-backend](https://github.com/Priyankm23/smart-tourist-safety-app-backend)` | Node.js, Express, MongoDB | ← **This repo** |
+| `[tourist-safety-app-frontend](https://github.com/Meetpatel006/smart-safety)` | React Native, Expo, Mapbox | Tourist mobile app |
+| `[authority-dashboard-frontend](https://github.com/Meetpatel006/authority-dashboard)` | React, Mapbox | Authority command center UI |
+| `[path-deviation-microservice](https://github.com/Meetpatel006/path-deviation)` | FastAPI, Python | Path tracking & deviation alerts |
 
 ---
 
