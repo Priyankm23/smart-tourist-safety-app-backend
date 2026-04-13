@@ -27,42 +27,42 @@ This repository is the **Node.js backend** — the single API serving both the R
 ## System Architecture
 
 ```
-┌──────────────────────────┐       ┌───────────────────────────────┐
-│     Tourist App           │       │     Authority Dashboard        │
-│     (React Native/Expo)   │       │     (React)                    │
-│                           │       │                                │
-│  • Map + Risk Zones       │       │  • Live Situation Map          │
-│  • SOS Panic Button       │       │  • Tourist Heatmap             │
-│  • Geofence Alerts        │       │  • SOS Management              │
-│  • Tour Group View        │       │  • Unit Assignment             │
-│  • Digital Tourist ID     │       │  • Tourist Profiles            │
-└───────────┬───────────────┘       └────────────────┬──────────────┘
-            │                                         │
-            │         REST API + Socket.IO            │
-            └─────────────────┬───────────────────────┘
-                              │
-            ┌─────────────────▼──────────────────────────────────┐
-            │              Express.js API Server                   │
-            │                                                      │
-            │  ┌───────────────┐   ┌──────────────┐               │
-            │  │ Auth & RBAC   │   │  Real-time   │               │
-            │  │ JWT · 4 roles │   │  Socket.IO   │               │
-            │  └───────────────┘   └──────────────┘               │
-            │                                                      │
-            │  ┌───────────────┐   ┌──────────────┐               │
-            │  │  Risk Engine  │   │  Blockchain  │               │
-            │  │  (background) │   │   Service    │               │
-            │  └───────────────┘   └──────────────┘               │
-            │                                                      │
-            │  ┌───────────────┐   ┌──────────────┐               │
-            │  │   News &      │   │   Fallback   │               │
-            │  │   Alerts Svc  │   │   Service    │               │
-            │  └───────────────┘   └──────────────┘               │
-            └───────┬──────────────────────────┬───────────────────┘
+   ┌──────────────────────────┐       ┌───────────────────────────────┐
+   │   Tourist App            │       │    Authority Dashboard        │
+   │   (React Native/Expo)    │       │    (React)                    │
+   │                          │       │                               │
+   │  • Map + Risk Zones      │       │  • Live Situation Map         │
+   │  • SOS Panic Button      │       │  • Tourist Heatmap            │
+   │  • Geofence Alerts       │       │  • SOS Management             │
+   │  • Tour Group View       │       │  • Unit Assignment            │
+   │  • Digital Touris ID     │       │  • Tourist Profile            │
+   └───────────┬──────────────┘       └────────────────┬──────────────┘
+               │                                       │
+               │         REST API + Socket.IO          │
+               └─────────────────┬─────────────────────┘
+                                 │
+            ┌────────────────────▼──────────────────────────────┐
+            │              Express.js API Server                │
+            │                                                   │
+            │       ┌───────────────┐   ┌──────────────┐        │
+            │       │ Auth & RBAC   │   │  Real-time   │        │
+            │       │ JWT · 4 roles │   │  Socket.IO   │        │
+            │       └───────────────┘   └──────────────┘        │
+            │                                                   │
+            │       ┌───────────────┐   ┌──────────────┐        │
+            │       │  Risk Engine  │   │  Blockchain  │        │
+            │       │  (background) │   │   Service    │        │
+            │       └───────────────┘   └──────────────┘        │
+            │                                                   │
+            │       ┌───────────────┐   ┌──────────────┐        │
+            │       │   News &      │   │   Fallback   │        │
+            │       │   Alerts Svc  │   │   Service    │        │
+            │       └───────────────┘   └──────────────┘        │
+            └───────┬──────────────────────────┬────────────────┘
                     │                          │
              ┌──────▼──────┐       ┌───────────▼────────────────┐
              │   MongoDB   │       │   Polygon L2 (Ethers.js)   │
-             │   + Mongoose│       │   Blockchain Audit Trail   │
+             │  + Mongoose │       │   Blockchain Audit Trail   │
              └─────────────┘       └────────────────────────────┘
 ```
 
