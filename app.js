@@ -19,6 +19,7 @@ const { updateRiskScores } = require("./services/riskEngineService");
 const { cleanupExpiredGeofences } = require("./services/itineraryGeofenceService");
 // const { fetchNewsIncidents } = require('./services/newsService'); // News service disabled
 const { init } = require('./services/realtimeService');
+const { getSosCounts } = require("./controllers/authority/SOSAlertPage");
 
 const app = express();
 const server = http.createServer(app);
