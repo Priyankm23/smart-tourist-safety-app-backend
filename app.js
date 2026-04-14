@@ -20,7 +20,7 @@ const { cleanupExpiredGeofences } = require("./services/itineraryGeofenceService
 // const { fetchNewsIncidents } = require('./services/newsService'); // News service disabled
 const { init } = require('./services/realtimeService');
 const { getSosCounts } = require("./controllers/authority/SOSAlertPage");
-
+const { arcjetGeneralMiddleware } = require("./middlewares/ArcjetMiddleware");
 const app = express();
 const server = http.createServer(app);
 
@@ -41,6 +41,8 @@ app.use(
     limit: "1mb",
   }),
 );
+
+app.use(arcjetGeneralMiddleware);
 
 // CORS configured above
 

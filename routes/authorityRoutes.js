@@ -1,17 +1,16 @@
 const express = require('express');
-const { assignUnitToAlert, getRespondingSosAlerts, getNewSosAlerts, resolveAlert,getSosCounts } = require('../controllers/authority/SOSAlertPage')
+const { assignUnitToAlert, getRespondingSosAlerts, getNewSosAlerts, resolveAlert, getSosCounts } = require('../controllers/authority/SOSAlertPage')
 const { getExpiredTouristData, getTouristManagementData, revokeTourist } = require('../controllers/authority/touristPage')
 const { getDashboardStats } = require('../controllers/authority/dashboard')
 const { getMapOverview } = require('../controllers/authority/mapPage')
 const { predictCrowdSurge } = require('../controllers/authority/analytics');
 const { createEFIR, getEFIRSummaries } = require('../controllers/authority/eFIRPage');
 const { createGeoFenceToDangerLocation } = require('../controllers/geofenceController');
-const  {verifyToken, isAuthority} = require('../middlewares/authMiddleware');
-const { arcjetGeneralMiddleware } = require('../middlewares/ArcjetMiddleware');
+const { verifyToken, isAuthority } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-router.use(verifyToken,arcjetGeneralMiddleware,isAuthority);
+router.use(verifyToken, isAuthority);
 
 // The 'authorize' middleware checks if the authenticated user has the 'authority' role
 router.get('/dashboard-stats', getDashboardStats);

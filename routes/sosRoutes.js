@@ -7,6 +7,6 @@ const router  = express.Router();
 
 router.use(verifyToken,arcjetSosMiddleware);
 
-router.post('/trigger',verifyToken,triggerSOS);
+router.post('/trigger',triggerSOS);
 
 module.exports = router;

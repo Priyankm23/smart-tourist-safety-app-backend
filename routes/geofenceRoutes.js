@@ -12,11 +12,10 @@ const {
   getAllZonesWithStyling
 } = require('../controllers/geofenceController');
 const { verifyToken } = require('../middlewares/authMiddleware');
-const { arcjetGeneralMiddleware } = require("../middlewares/ArcjetMiddleware");
 
 const router = express.Router();
 
-router.use(verifyToken,arcjetGeneralMiddleware);
+router.use(verifyToken);
 // Route to receive geofence transitions from the tourist app
 // router.post('/transitions', verifyToken, receiveGeofenceTransitions);
 
