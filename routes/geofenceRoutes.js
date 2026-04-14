@@ -1,21 +1,22 @@
 const express = require('express');
-const { 
-  receiveGeofenceTransitions, 
-  createGeoFenceToDangerLocation, 
-  getallZones, 
+const {
+  receiveGeofenceTransitions,
+  createGeoFenceToDangerLocation,
+  getallZones,
   getZonebyId,
-  getHighRiskZoneCount, 
-  getDynamicRiskZones, 
+  getHighRiskZoneCount,
+  getDynamicRiskZones,
   triggerRiskUpdate,
   createDestinationGeofence,
   getAllDestinationGeofences,
   getAllZonesWithStyling
 } = require('../controllers/geofenceController');
-// const { verifyToken } = require('../middlewares/authMiddleware');
-const { DangerZone, Geofence } = require('../models/Geofence');
+const { verifyToken } = require('../middlewares/authMiddleware');
+const { arcjetGeneralMiddleware } = require("../middlewares/ArcjetMiddleware");
 
 const router = express.Router();
 
+router.use(verifyToken,arcjetGeneralMiddleware);
 // Route to receive geofence transitions from the tourist app
 // router.post('/transitions', verifyToken, receiveGeofenceTransitions);
 
@@ -26,7 +27,7 @@ router.get('/count', getHighRiskZoneCount);
 // router.get('/:id', verifyToken, getZonebyId);
 
 // Risk grid routes
-router.get('/dynamic', getDynamicRiskZones); 
+router.get('/dynamic', getDynamicRiskZones);
 router.post('/risk/update', triggerRiskUpdate);
 
 // Destination geofence routes

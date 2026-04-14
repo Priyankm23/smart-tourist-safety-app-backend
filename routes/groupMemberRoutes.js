@@ -9,12 +9,12 @@ const {
   bulkAddMembers,
   sendWelcomeEmailsToAll,
 } = require("../controllers/groupMemberController");
+const { arcjetGeneralMiddleware } = require("../middlewares/ArcjetMiddleware");
 
 const router = express.Router();
 
 // All routes require authentication and tour-admin role
-router.use(verifyToken);
-router.use(isTourAdmin);
+router.use(verifyToken,arcjetGeneralMiddleware,isTourAdmin);
 
 // GET /api/group/members - Get all members with optional filters
 router.get("/", getAllMembers);

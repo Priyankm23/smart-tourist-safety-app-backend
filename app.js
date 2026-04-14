@@ -70,6 +70,7 @@ app.use("/api/geofence", geofenceRoutes);
 app.use("/api/sos", sosRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/itinerary", itineraryRoutes);
+app.get('/count', getSosCounts);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });

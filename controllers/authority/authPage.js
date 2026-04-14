@@ -1,7 +1,7 @@
 const Authority = require('../../models/Authority');
 const jwt = require('jsonwebtoken');
 
-exports.signUp = async (req, res, next) => {
+exports.authorityRegister = async (req, res, next) => {
   try {
     const { username, fullName, email, password, role, authorityId } = req.body;
 
@@ -39,7 +39,7 @@ exports.signUp = async (req, res, next) => {
   }
 };
 
-exports.signIn = async (req, res, next) => {
+exports.authorityLogin = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -86,7 +86,7 @@ exports.signIn = async (req, res, next) => {
   }
 }
 
-exports.verify = async (req, res, next) => {
+exports.authorityVerify = async (req, res, next) => {
   try {
     const user = await Authority.findById(req.user.id).select('-password');
 
@@ -115,7 +115,7 @@ exports.verify = async (req, res, next) => {
   }
 }
 
-exports.logOut = async (req, res, next) => {
+exports.authorityLogOut = async (req, res, next) => {
   res.clearCookie('auth_token', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',

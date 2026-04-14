@@ -19,5 +19,6 @@ module.exports = {
     RESEND_API_KEY,
     FROM_EMAIL,
     REDIS_PORT,
-    REDIS_HOST
+    REDIS_HOST,
+    ARCJET_KEY
 } = process.env;
