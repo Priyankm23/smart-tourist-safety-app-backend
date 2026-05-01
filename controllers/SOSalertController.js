@@ -130,16 +130,27 @@ const contract = new ethers.Contract(SMART_CONTRACT_ADDRESS_sos, SOSABI, wallet)
 exports.triggerSOS = async (req, res, next) => {
 	try {
 		const { location, safetyScore, locationName, sosReason } = req.body;
-		const touristId = req.user && req.user.touristId;
+		const touristId = req.user && (req.user.touristId || req.user.id);
 
 		// Basic validation (ensure touristId and location coordinates present)
 		if (!touristId || !location || !Array.isArray(location.coordinates) || location.coordinates.length < 2) {
 			return res.status(400).json({ error: 'Missing required SOS fields: touristId and location.coordinates [lng, lat]' });
 		}
 
-		// 1️⃣ Get tourist details
+		// 1️⃣ Get tourist details first; SOS records store tourist._id (ObjectId)
 		const tourist = await Tourist.findOne({ touristId });
 		if (!tourist) return res.status(404).json({ error: "Tourist not found" });
+
+		const LOOKBACK_MS = 5 * 60 * 1000;
+		const windowStart = new Date(Date.now() - LOOKBACK_MS);
+		const underFiveMinuteAlert = await SOSAlert.findOne({
+			touristId: tourist._id,
+			timestamp: { $gt: windowStart }
+		}).sort({ timestamp: -1 });
+
+		if(underFiveMinuteAlert){
+			return res.status(429).json({ message: "Your previous sos alert is still being reviewed and acted upon by authority. wait till 5 minutes to send another"})
+		}
 
 		// 2️⃣ Decrypt tourist personal information
 		const name = decrypt(tourist.nameEncrypted);
@@ -181,7 +192,7 @@ exports.triggerSOS = async (req, res, next) => {
 			const [lng, lat] = location.coordinates;
 			updatedGrid = await updateGridForLocation(lat, lng);
 			console.log('✅ Grid updated immediately for SOS location');
-			
+
 			// Emit real-time grid update to all connected clients
 			if (updatedGrid) {
 				realtimeService.emitRiskGridUpdated({
