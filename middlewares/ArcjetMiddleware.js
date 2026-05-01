@@ -1,5 +1,8 @@
 const getArcjet = require("../config/arcjet");
 const { ARCJET_KEY } = require("../config/config");
+const { NODE_ENV } = require("../config/config");
+
+const isDevMode = NODE_ENV === "development";
 
 let registerAj = null;
 let loginAj = null;
@@ -21,8 +24,17 @@ const initRegisterAj = async () => {
                 interval: 60,          // per minute
                 capacity: 3,           // max burst
             }),
-            detectBot({ mode: "LIVE", allow: [] }),
-            shield({ mode: "LIVE" }),
+            detectBot({
+                mode: "LIVE", allow: isDevMode
+                    ? [
+                        "CATEGORY:SEARCH_ENGINE",
+                        "CATEGORY:TOOL",        // ✅ allows Postman, curl, etc.
+                        "CATEGORY:MONITOR",
+                    ] : [
+                        "CATEGORY:SEARCH_ENGINE"
+                    ]
+            }),
+            shield({ mode: isDevMode ? "DRY_RUN" : "LIVE" }),
         ],
     });
 
@@ -44,8 +56,17 @@ const initLoginAj = async () => {
                 interval: 60,          // per minute
                 capacity: 10,          // slight burst allowed
             }),
-            detectBot({ mode: "LIVE", allow: [] }),
-            shield({ mode: "LIVE" }),
+            detectBot({
+                mode: "LIVE", allow: isDevMode
+                    ? [
+                        "CATEGORY:SEARCH_ENGINE",
+                        "CATEGORY:TOOL",        // ✅ allows Postman, curl, etc.
+                        "CATEGORY:MONITOR",
+                    ] : [
+                        "CATEGORY:SEARCH_ENGINE"
+                    ]
+            }),
+            shield({ mode: isDevMode ? "DRY_RUN" : "LIVE" }),
         ],
     });
 
@@ -55,7 +76,7 @@ const initLoginAj = async () => {
 const initSosAj = async () => {
     if (sosAj) return sosAj;
 
-    const { arcjet, tokenBucket } = await getArcjet();
+    const { arcjet, tokenBucket, detectBot, shield } = await getArcjet();
 
     sosAj = arcjet({
         key: ARCJET_KEY,
@@ -63,10 +84,19 @@ const initSosAj = async () => {
         rules: [
             tokenBucket({
                 mode: "LIVE",
-                refillRate: 1,
-                interval: 300,         // 1 per 5 minutes
-                capacity: 3,
+                refillRate: 2,
+                interval: 180,         // 2 per 3 minutes
+                capacity: 5,
             }),
+            detectBot({
+                mode: "LIVE", allow: isDevMode
+                    ? [
+                        "CATEGORY:SEARCH_ENGINE",
+                        "CATEGORY:TOOL",        // ✅ allows Postman, curl, etc.
+                        "CATEGORY:MONITOR",
+                    ] : []
+            }),
+            shield({ mode: isDevMode ? "DRY_RUN" : "LIVE" }),
         ],
     });
 
@@ -80,7 +110,7 @@ const initGeneralAj = async () => {
 
     generalAj = arcjet({
         key: ARCJET_KEY,
-        characteristics: ["userId","ip.src"],
+        characteristics: ["userId", "ip.src"],
         rules: [
             tokenBucket({
                 mode: "LIVE",
@@ -88,8 +118,17 @@ const initGeneralAj = async () => {
                 interval: 60,
                 capacity: 60,          // burst = 2x refillRate, not 100
             }),
-            detectBot({ mode: "LIVE", allow: ["CATEGORY:SEARCH_ENGINE"] }),
-            shield({ mode: "LIVE" }),
+            detectBot({
+                mode: "LIVE", allow: isDevMode
+                    ? [
+                        "CATEGORY:SEARCH_ENGINE",
+                        "CATEGORY:TOOL",        // ✅ allows Postman, curl, etc.
+                        "CATEGORY:MONITOR",
+                    ] : [
+                        "CATEGORY:SEARCH_ENGINE"
+                    ]
+            }),
+            shield({ mode: isDevMode ? "DRY_RUN" : "LIVE" }),
         ],
     });
 
@@ -100,6 +139,13 @@ const initGeneralAj = async () => {
 const arcjetRegisterMiddleware = async (req, res, next) => {
     try {
         const aj = await initRegisterAj();
+
+        const ip =
+            req.ip ||
+            req.headers["x-forwarded-for"]?.split(",")[0] ||
+            req.socket?.remoteAddress ||
+            "127.0.0.1";
+
         const decision = await aj.protect(req, { requested: 1 });
 
         if (decision.isDenied()) {
@@ -121,6 +167,13 @@ const arcjetRegisterMiddleware = async (req, res, next) => {
 const arcjetLoginMiddleware = async (req, res, next) => {
     try {
         const aj = await initLoginAj();
+
+        const ip =
+            req.ip ||
+            req.headers["x-forwarded-for"]?.split(",")[0] ||
+            req.socket?.remoteAddress ||
+            "127.0.0.1";
+
         const decision = await aj.protect(req, { requested: 1 });
 
         if (decision.isDenied()) {
@@ -168,6 +221,13 @@ const arcjetSosMiddleware = async (req, res, next) => {
 const arcjetGeneralMiddleware = async (req, res, next) => {
     try {
         const aj = await initGeneralAj();
+
+        const ip =
+            req.ip ||
+            req.headers["x-forwarded-for"]?.split(",")[0] ||
+            req.socket?.remoteAddress ||
+            "127.0.0.1";
+
         const decision = await aj.protect(req, {
             requested: 1,
             userId: req.user?.id ?? req.ip,

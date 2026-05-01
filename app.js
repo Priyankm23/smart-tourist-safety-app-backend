@@ -41,7 +41,7 @@ app.use(
     limit: "1mb",
   }),
 );
-
+app.set("trust proxy",true);
 app.use(arcjetGeneralMiddleware);
 
 // CORS configured above
