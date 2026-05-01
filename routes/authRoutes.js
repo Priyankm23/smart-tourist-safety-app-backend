@@ -23,7 +23,7 @@ router.post("/signup", arcjetRegisterMiddleware,authorityRegister);
 // strict — auth routes
 router.post("/login", arcjetLoginMiddleware, loginTourist);
 router.post("/login-with-codes", arcjetLoginMiddleware, loginWithCodes);
-router.post("/login",arcjetLoginMiddleware, authorityLogin);
+router.post("/login-authority",arcjetLoginMiddleware, authorityLogin);
 
 // relaxed — general routes
 router.get('/verify/:touristId', arcjetGeneralMiddleware, verifyTouristRecord);
